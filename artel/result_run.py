@@ -221,6 +221,14 @@ def proc_identity(pid: int) -> dict | None:
         return None
 
 
+def write_pidfile(path: Path, record: dict) -> None:
+    """Replace run.pid atomically: readers (the CLI polling for it, another process) see the old or the new record,
+    never an empty or half-written file."""
+    tmp = path.with_name(f"{path.name}.{os.getpid()}.tmp")
+    tmp.write_text(json.dumps(record), encoding="utf-8")
+    os.replace(tmp, path)
+
+
 def pid_record(pid: int, **extra) -> dict:
     ident = proc_identity(pid) or {"create_time": "", "argv0": ""}
     pgid = pid
@@ -431,7 +439,7 @@ class ResultRunner:
             self.live[project.slug] = live
         record = pid_record(proc.pid, port=port)
         try:
-            pidfile.write_text(json.dumps(record), encoding="utf-8")
+            write_pidfile(pidfile, record)
         except OSError:
             pass
         threading.Thread(target=self._watch, args=(proc, pidfile), daemon=True).start()
@@ -443,7 +451,7 @@ class ResultRunner:
         live.url += spec.get("url_path", "") if spec.get("url_path", "").startswith("/") else ""
         if proc.poll() is None:
             try:
-                pidfile.write_text(json.dumps({**record, "port": live.port, "url": live.url}), encoding="utf-8")
+                write_pidfile(pidfile, {**record, "port": live.port, "url": live.url})
             except OSError:
                 pass
         end = time.monotonic() + READY_WAIT_S

@@ -317,3 +317,55 @@ def test_preview_subresources_need_a_scoped_short_lived_token(server, tmp_path):
     assert req(f"{api}/preview/@{tok}/site/s.css")[0] == 401  # expired (10 minutes)
     base2, *_ = server(False)  # local mode needs no token and issues none
     assert "preview_token" not in json.loads(req(f"{base2}/api/projects/{project.slug}/file?path=site/index.html")[2])
+
+
+class UnreadAtClose(LocalHTTPServer):
+    """Records how many request bytes were still unread in the socket when the server closed the connection."""
+    unread: list
+
+    def shutdown_request(self, request):
+        import socket
+        try:
+            self.unread.append(len(request.recv(1 << 20, socket.MSG_PEEK | socket.MSG_DONTWAIT)))
+        except OSError:
+            self.unread.append(0)
+        super().shutdown_request(request)
+
+
+@pytest.mark.parametrize("headers,code", [
+    ({}, 401),                                         # not logged in
+    ({"Origin": "http://evil.example"}, 403),          # forged cross-origin
+    ({"Content-Type": "text/plain"}, 403),             # not JSON
+])
+def test_refused_post_leaves_no_unread_request_body_at_close(tmp_path, monkeypatch, headers, code):
+    """A refusal sent without reading the request body leaves unread bytes in the socket; closing it then resets the
+    connection (RST), which on Windows aborts the client's read (WinError 10053) before it reads the response."""
+    import socket
+    import time
+
+    monkeypatch.setenv("ARTEL_HOME", str(tmp_path))
+    runner = Runner(deep_merge(DEFAULT_CONFIG, {"provider": "scripted"}))
+    httpd = UnreadAtClose(("127.0.0.1", 0), make_handler(runner, Auth(home=tmp_path, session_days=30, clock=Clock())))
+    httpd.unread = []
+    httpd.daemon_threads = True
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    try:
+        port = httpd.server_address[1]
+        payload = b'{"goal": "' + b"x" * 200_000 + b'"}'
+        hdrs = {"Host": f"127.0.0.1:{port}", "Content-Type": "application/json", "Content-Length": str(len(payload))}
+        hdrs.update(headers)
+        head = "POST /api/projects HTTP/1.1\r\n" + "".join(f"{k}: {v}\r\n" for k, v in hdrs.items()) + "\r\n"
+        with socket.create_connection(("127.0.0.1", port), timeout=5) as s:
+            s.sendall(head.encode() + payload)
+            data = b""
+            while chunk := s.recv(65536):
+                data += chunk
+        deadline = time.time() + 5
+        while not httpd.unread and time.time() < deadline:
+            time.sleep(0.01)
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
+    assert data.split(b"\r\n", 1)[0].split()[1] == str(code).encode()
+    assert b'"error"' in data.split(b"\r\n\r\n", 1)[1]
+    assert httpd.unread == [0]

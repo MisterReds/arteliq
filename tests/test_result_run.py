@@ -616,3 +616,36 @@ def test_cli_run_stops_child_on_sigterm(project):
     finally:
         p.kill()
         p.wait()
+
+
+def test_pidfile_is_never_visible_empty_or_half_written(tmp_path):
+    """The CLI waits for run.pid to exist and then parses it: a file that exists but is still being written (created
+    empty, then filled) made `result run` fail with 'Expecting value: line 1 column 1' (macOS CI)."""
+    from artel.result_run import write_pidfile
+
+    pf = tmp_path / "run.pid"
+    record = {"pid": 1, "url": "http://127.0.0.1:1/" + "x" * 500_000}
+    stop = threading.Event()
+    seen = []
+
+    def watch():
+        while not stop.is_set():
+            try:
+                text = pf.read_text()
+            except OSError:
+                continue
+            try:
+                json.loads(text)
+            except ValueError:
+                seen.append(len(text))
+
+    t = threading.Thread(target=watch)
+    t.start()
+    try:
+        for _ in range(300):
+            write_pidfile(pf, record)
+            pf.unlink()
+    finally:
+        stop.set()
+        t.join()
+    assert seen == []
