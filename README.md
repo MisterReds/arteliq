@@ -639,3 +639,7 @@ S-cloud-1 — один прогон в облачном контейнере б�
 `--update-baseline --allow-add`. Порог покрытия лежит в `scripts/coverage_threshold.txt` и может только расти
 (`python3 scripts/coverage_gate.py raise coverage.json`). Мутанты, которые выжили и объяснены, перечисляются в
 `scripts/mutation_explained.txt` (`файл:строка: причина`).
+
+## Лицензия
+
+Apache License 2.0 — см. [LICENSE](LICENSE).
