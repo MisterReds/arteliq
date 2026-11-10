@@ -307,3 +307,32 @@ def test_evolve_items_picks_exact_items_and_rejects_unknown_ids(tmp_path, monkey
                         lambda self, n, wave=None, ids=None, **kw: seen.update(n=n, ids=ids) or {"roadmap": {}})
     assert cli.main(["evolve", "--repo", str(repo), "--items", "W2-c, W1-a"]) == 0
     assert seen == {"n": 2, "ids": ["W2-c", "W1-a"]}
+
+
+def test_renderers_cope_with_sparse_entries_and_cap_the_closes_list(tmp_path):
+    """Items and harness entries with only the required keys render with their defaults; a long list of mechanisms
+    an item closes is cut at eight with an ellipsis, exactly eight is not."""
+    from artel.roadmap_html import render_html
+
+    (tmp_path / "roadmap.yaml").write_text(
+        "pillars:\n  - id: P1-x\n    title: Pillar\n    source: {harness: H, repo: a/b}\n    status: done\nwaves:\n  1: First\nitems:\n"
+        "  - id: I-bare\n    title: Bare item\n"
+        "  - id: I-nine\n    wave: 7\n    title: Nine closes\n    status: partial\n    mode: design\n"
+        "    source: {harness: H, repo: a/b}\n"
+        "  - id: I-eight\n    wave: 7\n    title: Eight closes\n    status: done\n    mode: evolve\n"
+        "    source: {harness: H, repo: a/b, paths: [x.md], license: MIT}\n"
+        "    acceptance: [one, two]\n    result: shipped\n    target: [artel/a.py]\n",
+        encoding="utf-8")
+    nine = "".join(f"  - {{name: F{i}, artel: planned, ref: I-nine}}\n" for i in range(9))
+    eight = "".join(f"  - {{name: G{i}, artel: planned, ref: I-eight}}\n" for i in range(8))
+    (tmp_path / "harnesses.yaml").write_text(
+        "snapshot: '2026-10-07'\nfindings: []\nharnesses:\n- repo: o/h\n  name: Hx\n  class: coding-agent\n"
+        "  origin: originator\n  origin_note: why\n  metrics: {}\n  features:\n" + nine + eight, encoding="utf-8")
+    page = render_html(tmp_path)
+    assert "Волна 7 <" in page and "First" not in page  # an untitled wave falls back to its number
+    assert "Закрывает: Hx — F0; Hx — F1; Hx — F2; Hx — F3; Hx — F4; Hx — F5; Hx — F6; Hx — F7 …<" in page
+    assert "F8" not in page.split('id="I-nine"')[1].split("</div></div>")[2]
+    assert "Hx — G6; Hx — G7</div>" in page  # eight closes: all shown, no ellipsis
+    md = Roadmap.of_repo(tmp_path).render_markdown()
+    assert "## Волна 0 — 0/1 готово" in md and "## Волна 7 — 1/2 готово" in md
+    assert "| I-bare | Bare item |  (``) | None | None |" in md
