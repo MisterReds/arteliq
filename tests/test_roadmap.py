@@ -81,6 +81,21 @@ def test_next_items_order_modes_and_dependencies(tmp_path):
     assert "Волна 1 — 1/3 готово" in rm.render_markdown()
 
 
+def test_wave_titles_replace_the_default_heading(tmp_path):
+    from artel.roadmap import ABSORB_WAVE
+    from artel.roadmap_html import render_html
+
+    assert ABSORB_WAVE == 20
+    path = _toy(tmp_path)
+    path.write_text('waves:\n  1: "M1 · Доказательство"\n' + path.read_text(encoding="utf-8"), encoding="utf-8")
+    rm = Roadmap(path)
+    assert rm.wave_titles == {1: "M1 · Доказательство"}
+    md = rm.render_markdown()
+    assert "## M1 · Доказательство — 0/3 готово" in md and "Волна 1" not in md and "Волна 2 — 0/1 готово" in md
+    html = render_html(tmp_path)
+    assert "M1 · Доказательство" in html and "Волна 1" not in html and "Волна 2" in html
+
+
 def test_hypothesis_carries_donor_sources_and_license(tmp_path):
     donor = tmp_path / "donor"
     donor.mkdir()
@@ -214,7 +229,7 @@ def test_absorb_turns_findings_into_roadmap_items_and_cycle_follows_the_plan(tmp
     assert [h["repo"] for h in next_to_study(repo, reg, n=5)] == ["x/high", "x/low"]
 
     # a cycle studies nothing new here (registry patched to the already studied source) and implements the
-    # next items in plan order: wave 1 first, the absorbed wave-4 item waits its turn
+    # next items in plan order: wave 1 first, the absorbed wave-20 item waits its turn
     monkeypatch.setattr("artel.roadmap.next_to_study", lambda repo, n=1: [])
     s = ev.cycle(items=1)
     assert impls == ["roadmap:W1-a"] and s["generation"]["roadmap"] == {"W1-a": "done"}

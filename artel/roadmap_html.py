@@ -7,7 +7,7 @@ import html
 from collections import Counter, defaultdict
 from pathlib import Path
 
-from .roadmap import SIGNIFICANCE, STATUS_MARK, STUDY, TIERS, Roadmap, load_harnesses, significance
+from .roadmap import ABSORB_WAVE, SIGNIFICANCE, STATUS_MARK, STUDY, TIERS, Roadmap, load_harnesses, significance
 
 E = html.escape
 FEATURE = {"done": ("есть", "ok"), "partial": ("частично", "warn"), "planned": ("в плане", "run"), "gap": ("пробел", "bad"), "skip": ("не берём", "todo")}
@@ -245,8 +245,8 @@ def render_html(repo: Path, today: str | None = None) -> str:
         group = [it for it in ordered if it.get("wave", 0) == w]
         done = sum(1 for it in group if it.get("status") == "done")
         title = {0: "Сделано вручную (продукт и надёжность)", 1: "Волна 1 — надёжность цикла",
-                 2: "Волна 2 — изоляция и безопасность", 3: "Волна 3 — ядро и долгие задачи",
-                 4: "Волна 4 — найдено разбором проектов"}.get(w, f"Волна {w}")
+                 2: "Волна 2 — изоляция и безопасность", 3: "Волна 3 — ядро и долгие задачи"}.get(w, f"Волна {w}")
+        title = (rm.wave_heading(w) or title) + (" (найдено разбором проектов)" if w == ABSORB_WAVE else "")
         out.append(f'<div class="wave"><h3 style="margin:22px 0 6px">{E(title)} <span class="sub">— {done}/{len(group)} готово</span></h3>')
         for it in group:
             st = it.get("status", "planned")

@@ -16,7 +16,7 @@ from pathlib import Path
 import yaml
 
 OPEN = ("planned", "partial", "in_progress")
-ABSORB_WAVE = 4                       # items found by studying other harnesses queue after the hand-planned waves
+ABSORB_WAVE = 20                      # items found by studying other harnesses queue after the hand-planned waves
 STUDY_CATEGORIES = ("harness", "orchestrator", "memory-skills", "framework", "sandbox", "eval", "protocol")
 STATUS_MARK = {"done": "готово", "partial": "частично", "in_progress": "в работе", "planned": "план",
                "blocked": "нужна помощь"}
@@ -28,6 +28,11 @@ class Roadmap:
         self.data = yaml.safe_load(self.path.read_text(encoding="utf-8")) or {}
         self.pillars: list[dict] = self.data.get("pillars", [])
         self.items: list[dict] = self.data.get("items", [])
+        self.wave_titles: dict[int, str] = {int(k): str(v) for k, v in (self.data.get("waves") or {}).items()}
+
+    def wave_heading(self, w: int) -> str | None:
+        """The title given in roadmap.yaml `waves:`, if any (the renderers fall back to "Волна N")."""
+        return self.wave_titles.get(w)
 
     @classmethod
     def of_repo(cls, repo: Path) -> Roadmap:
@@ -165,7 +170,8 @@ class Roadmap:
             items = [it for it in self.items if it.get("wave", 0) == w]
             done = sum(1 for it in items if it.get("status") == "done")
             label = " (найдено разбором проектов)" if w == ABSORB_WAVE else ""
-            out += ["", f"## Волна {w}{label} — {done}/{len(items)} готово", "",
+            heading = self.wave_heading(w) or f"Волна {w}"
+            out += ["", f"## {heading}{label} — {done}/{len(items)} готово", "",
                     "| Пункт | Что | Откуда | Режим | Статус |", "|---|---|---|---|---|"]
             for it in items:
                 s = it.get("source") or {}
