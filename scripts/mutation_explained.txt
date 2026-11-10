@@ -2,3 +2,8 @@
 # (equivalent mutants, logging text, defensive branches that cannot be reached). Everything else must be killed by a test.
 artel/contracts/_base.py:65: equivalent mutant, typing.cast(float, v) -> cast(None, v): cast returns its argument at runtime
 artel/contracts/schemas.py:31: equivalent mutant, fields(cast(Any, self)) -> fields(cast(None, self)): cast is a runtime no-op
+artel/roadmap_html.py:276: equivalent mutants, dict.get default for a key every harnesses.yaml entry has ("studied", "class"); moved unchanged from render_html
+artel/roadmap_html.py:278: equivalent mutants, .get default for "origin_note" (every entry has it, the consistency test requires it); moved unchanged
+artel/roadmap_html.py:279: equivalent mutant, .get("stars") or 0 default: every metrics block has stars; moved unchanged
+artel/roadmap_html.py:330: equivalent mutants, h.get("features", []) default and defaultdict factory: every reached key is assigned before it is read; moved unchanged
+artel/roadmap_html.py:339: equivalent mutant, hs.get("snapshot", "") default: harnesses.yaml always has a snapshot; moved unchanged

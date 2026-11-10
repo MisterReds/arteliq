@@ -135,7 +135,7 @@ def write_config(root: Path, files: list[str], tests: list[str]) -> Path:
     if cfg.exists():
         raise SystemExit("mutation: setup.cfg exists; the gate writes its own temporary mutmut config there")
     cfg.write_text(
-        "[mutmut]\nsource_paths=artel\nalso_copy=\n    scripts/\nmutate_only_covered_lines=true\nonly_mutate=\n"
+        "[mutmut]\nsource_paths=artel\nalso_copy=\n    scripts/\n    roadmap.yaml\n    harnesses.yaml\n    studied.yaml\n    docs/\nmutate_only_covered_lines=true\nonly_mutate=\n"
         + "".join(f"    {f}\n" for f in files)
         + "pytest_add_cli_args=\n    -p\n    no:randomly\n    -q\n"
         + "".join(f"    --deselect\n    {d}\n" for d in DESELECT)
