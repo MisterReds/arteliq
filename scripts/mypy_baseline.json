@@ -24,7 +24,7 @@
  "artel/result_run.py": 3,
  "artel/retrieval.py": 6,
  "artel/roadmap.py": 5,
- "artel/roadmap_html.py": 3,
+ "artel/roadmap_html.py": 2,
  "artel/routing.py": 3,
  "artel/runtimes/__init__.py": 1,
  "artel/runtimes/mcp_client.py": 10,
