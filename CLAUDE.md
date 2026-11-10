@@ -17,6 +17,22 @@ context small and spends it on decisions.
 Without these definitions loaded, use the general-purpose agent with `model: haiku` / `model: sonnet` and paste the
 same instructions.
 
+## Models and effort (same rules as the harness, docs/ORCHESTRATION.md §1)
+
+- **Main session:** the everyday strong model at medium effort. The frontier model is for a separate architecture
+  or analysis session, not for running a milestone.
+- **Never switch the model inside a long session.** The prompt cache belongs to a model: a switch rewrites the whole
+  context once at full price. Start a new session and hand over with `docs/PLAN-1.0.md`, `roadmap.yaml` and the
+  branch names.
+- **Effort before model.** A subagent that fell short is retried with the reviewer's findings at a higher effort;
+  only then on the next model, starting at a lower effort. Self-verification (a test, a build, a script) comes
+  before both.
+- **Small models are single-shot.** `scout` and `compressor` answer one question; they do not run long tool loops.
+- **A team only where there is breadth.** One dependent chain, or work that fits one context, goes to one
+  `executor` from test to green CI. Fan out only independent pieces.
+- **Independence over price in review.** The `critic` runs in a fresh context and never reviews what it wrote; a
+  stronger model is not a substitute for a second look.
+
 ## Protocol for the main session
 
 1. **Refine first** when a request is ambiguous or large: `prompt-refiner` → contract; work from the contract.
