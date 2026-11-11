@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import ast
 import difflib
+import functools
 import os
 import re
 import shutil
@@ -23,11 +24,12 @@ EXPLAINED = "scripts/mutation_explained.txt"
 # Tests that inspect the SOURCE or the SHAPE of the code under mutation. mutmut rewrites that source (it injects
 # ``from mutmut.mutation import trampoline`` into every mutated module), so these tests cannot pass in a mutation run
 # although the code is fine; they guard structure, not behaviour, and run in the normal test job.
-ALSO_COPY = ("scripts/", "roadmap.yaml", "harnesses.yaml", "studied.yaml", "docs/")
 DESELECT = (
     "tests/test_ports.py::test_import_boundaries",
     "tests/test_ports.py::test_no_vendor_names_in_packages",
     "tests/test_ports.py::test_fakes_satisfy_protocols",  # runtime-protocol check of the trampolined fakes
+    # the module snapshots the worktree through `git ls-files`, which lists nothing in the untracked mutants/ copy
+    "tests/test_reinstall.py",
 )
 SURVIVOR = re.compile(r"^\s+(?P<name>\S+): (?P<status>survived|no tests|suspicious|timeout|not checked)\s*$")
 
@@ -81,6 +83,23 @@ def mutant_glob(path: str, cls: str | None, func: str) -> str:
     return f"{module}.xǁ{cls}ǁ{func}__mutmut_*" if cls else f"{module}.x_{func}__mutmut_*"
 
 
+@functools.lru_cache(maxsize=8)
+def parsed(source: str) -> ast.Module:
+    """One parse per source text: classify() asks about thousands of mutants of the same few files."""
+    return ast.parse(source)
+
+
+@functools.lru_cache(maxsize=8)
+def variant_bodies(mutants_source: str) -> dict[str, list[str]]:
+    """Stripped body lines of every ``..__mutmut_*`` function of mutmut's output file, keyed by function name."""
+    lines = mutants_source.splitlines()
+    return {
+        node.name: [ln.strip() for ln in lines[node.body[0].lineno - 1 : node.end_lineno]]
+        for node in ast.walk(parsed(mutants_source))
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and "__mutmut_" in node.name
+    }
+
+
 def mutated_lines(original: str, mutants_source: str, mutant_name: str) -> set[int]:
     """Lines of the real file that a mutant changes.
 
@@ -88,18 +107,16 @@ def mutated_lines(original: str, mutants_source: str, mutant_name: str) -> set[i
     (``..__mutmut_N``) with the same layout; the two are compared line by line and the differing positions are
     mapped onto the real function's lines."""
     _, cls, func = split_name(mutant_name)
-    real = find_function(ast.parse(original), cls, func)
+    real = find_function(parsed(original), cls, func)
     if real is None:
         return set()
-    suffix = mutant_name.rpartition(".")[2].rpartition("__mutmut_")[2]
+    prefix, _, suffix = mutant_name.rpartition(".")[2].rpartition("__mutmut_")
     wanted = {suffix, "orig"}
-    texts: dict[str, list[str]] = {}
-    mutants_lines = mutants_source.splitlines()
-    for node in ast.walk(ast.parse(mutants_source)):
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and "__mutmut_" in node.name:
-            tag = node.name.rpartition("__mutmut_")[2]
-            if tag in wanted and node.name.startswith(mutant_name.rpartition(".")[2].rpartition("__mutmut_")[0]):
-                texts[tag] = [ln.strip() for ln in mutants_lines[node.body[0].lineno - 1 : node.end_lineno]]
+    texts = {
+        name.rpartition("__mutmut_")[2]: body
+        for name, body in variant_bodies(mutants_source).items()
+        if name.rpartition("__mutmut_")[2] in wanted and name.startswith(prefix)
+    }
     if set(texts) != wanted:
         return {real.lineno}
     first = real.body[0].lineno  # compare bodies: the def lines differ by name
@@ -131,13 +148,22 @@ def tests_for(root: Path, files: list[str]) -> list[str]:
     return sorted(f"tests/{p.name}" for p in tests if regex.search(p.read_text(encoding="utf-8")))
 
 
+def repo_data(root: Path) -> list[str]:
+    """Top-level tracked entries besides the package and the tests (which mutmut copies itself): the data the tests
+    read from the repo root (docs/, bench/, install.sh, ...) must exist in mutants/ too, or the clean run fails."""
+    out = subprocess.run(["git", "ls-files"], cwd=root, capture_output=True, text=True, check=False).stdout
+    tops = {line.split("/", 1)[0] + ("/" if "/" in line else "") for line in out.splitlines() if line}
+    data = sorted(t for t in tops if t not in ("artel/", "tests/", "setup.cfg") and not t.startswith("."))
+    return data or ["scripts/"]
+
+
 def write_config(root: Path, files: list[str], tests: list[str]) -> Path:
     cfg = root / "setup.cfg"
     if cfg.exists():
         raise SystemExit("mutation: setup.cfg exists; the gate writes its own temporary mutmut config there")
     cfg.write_text(
         "[mutmut]\nsource_paths=artel\nalso_copy=\n"
-        + "".join(f"    {c}\n" for c in ALSO_COPY)  # roadmap tests read the real data files
+        + "".join(f"    {d}\n" for d in repo_data(root))
         + "mutate_only_covered_lines=true\nonly_mutate=\n"
         + "".join(f"    {f}\n" for f in files)
         + "pytest_add_cli_args=\n    -p\n    no:randomly\n    -q\n"

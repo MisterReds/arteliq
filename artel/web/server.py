@@ -313,11 +313,20 @@ def make_handler(runner: Runner, auth=None):
             self.end_headers()
             self.wfile.write(body)
 
+        def _take_body(self) -> None:
+            """Read the request body off the socket before anything is decided. A refusal sent while body bytes are
+            still unread makes the close reset the connection (RST), and the client loses the response (on Windows:
+            WinError 10053 while reading it). Oversized or malformed lengths stay unread and fail in _body()."""
+            try:
+                n = int(self.headers.get("Content-Length") or 0)
+            except ValueError:
+                n = -1
+            self._raw = self.rfile.read(n) if 0 <= n <= MAX_BODY else None
+
         def _body(self) -> dict:
-            n = int(self.headers.get("Content-Length") or 0)
-            if n > MAX_BODY:
-                raise ValueError("request body too large")
-            return json.loads(self.rfile.read(n) or b"{}") if n else {}
+            if self._raw is None:
+                raise ValueError("bad or oversized request body")
+            return json.loads(self._raw) if self._raw else {}
 
         # --- remote mode: who is asking, over what, and are they logged in ---------------------------
         def _forwarded_for(self) -> str | None:
@@ -733,6 +742,7 @@ def make_handler(runner: Runner, auth=None):
                 time.sleep(0.7)
 
         def do_POST(self):
+            self._take_body()
             parts = [unquote(p) for p in urlparse(self.path).path.strip("/").split("/") if p]
             forged = self._forged()
             if forged:
