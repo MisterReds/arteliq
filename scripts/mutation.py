@@ -157,7 +157,16 @@ def repo_data(root: Path) -> list[str]:
     return data or ["scripts/"]
 
 
-def write_config(root: Path, files: list[str], tests: list[str]) -> Path:
+CLEAN_FAILURE = re.compile(r"^(?:FAILED|ERROR) (?P<test>tests/\S+)", re.M)
+MAX_EXCLUSION_ROUNDS = 3
+
+
+def failed_tests(log_text: str) -> list[str]:
+    """Test ids pytest reported as failed or errored in a mutmut log, in order, without repeats."""
+    return list(dict.fromkeys(m.group("test") for m in CLEAN_FAILURE.finditer(log_text.replace("\r", "\n"))))
+
+
+def write_config(root: Path, files: list[str], tests: list[str], exclude: tuple[str, ...] = ()) -> Path:
     cfg = root / "setup.cfg"
     if cfg.exists():
         raise SystemExit("mutation: setup.cfg exists; the gate writes its own temporary mutmut config there")
@@ -167,7 +176,7 @@ def write_config(root: Path, files: list[str], tests: list[str]) -> Path:
         + "mutate_only_covered_lines=true\nonly_mutate=\n"
         + "".join(f"    {f}\n" for f in files)
         + "pytest_add_cli_args=\n    -p\n    no:randomly\n    -q\n"
-        + "".join(f"    --deselect\n    {d}\n" for d in DESELECT)
+        + "".join(f"    --deselect\n    {d}\n" for d in (*DESELECT, *exclude))
         + ("pytest_add_cli_args_test_selection=\n" + "".join(f"    {t}\n" for t in tests) if tests else ""),
         encoding="utf-8",
     )
@@ -244,13 +253,29 @@ def run_mutation(root: Path, changed: dict[str, set[int]], *, budget_min: float,
     explained = parse_explained((root / EXPLAINED).read_text() if (root / EXPLAINED).exists() else "")
     tests = tests_for(root, files)
     print(f"mutation: {len(globs)} changed function(s) in {len(files)} file(s); tests: " + (", ".join(tests) or "all"))
-    cfg = write_config(root, files, tests)
-    shutil.rmtree(root / "mutants", ignore_errors=True)
     start = time.monotonic()
+    excluded: tuple[str, ...] = ()
+    cfg = root / "setup.cfg"
     try:
-        timed_out, code = run_mutmut(root, globs, budget_min)
-        if not timed_out and code:
-            print(f"mutation: mutmut run failed (exit {code}); tail of mutmut-run.log:\n{log_tail(root)}")
+        for _ in range(MAX_EXCLUSION_ROUNDS + 1):
+            cfg = write_config(root, files, tests, excluded)
+            shutil.rmtree(root / "mutants", ignore_errors=True)
+            timed_out, code = run_mutmut(root, globs, budget_min)
+            if timed_out or not code:
+                break
+            # The unmutated run failed. A test that passes in the real tree (the test job checks that) but not in
+            # mutmut's copy cannot judge mutants: leave it out, say so, and run again. Anything else is a real failure.
+            log_text = (root / "mutmut-run.log").read_text("utf-8", "replace")
+            broken = [t for t in failed_tests(log_text) if t not in excluded]
+            if not broken or len(excluded) + len(broken) > 20:
+                print(f"mutation: mutmut run failed (exit {code}); tail of mutmut-run.log:\n{log_tail(root)}")
+                return 1
+            excluded += tuple(broken)
+            print(f"mutation: {len(broken)} test(s) cannot run inside the mutants tree and are left out: "
+                  + ", ".join(broken))
+            cfg.unlink(missing_ok=True)
+        else:
+            print(f"mutation: mutmut run still fails after {MAX_EXCLUSION_ROUNDS} exclusion rounds:\n{log_tail(root)}")
             return 1
         unexplained, explained_hits, untried = classify(root, changed, explained)
     finally:
