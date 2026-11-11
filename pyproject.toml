@@ -1,6 +1,6 @@
 [project]
 name = "arteliq"
-version = "0.1.1"
+version = "0.1.2"
 description = "Self-improving multi-agent harness: goal -> project -> kanban -> workers -> verified result"
 readme = {file = "docs/PYPI.md", content-type = "text/markdown"}
 license = "Apache-2.0"
