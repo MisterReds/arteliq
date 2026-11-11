@@ -1388,7 +1388,7 @@ items:
   - id: M1-native-tiers
     wave: 11
     mode: design
-    status: planned
+    status: done
     title: 'Defect: API runs put every role on the default strongest model because the native profile table is empty'
     source:
       harness: Arteliq
