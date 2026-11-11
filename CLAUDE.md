@@ -17,6 +17,22 @@ context small and spends it on decisions.
 Without these definitions loaded, use the general-purpose agent with `model: haiku` / `model: sonnet` and paste the
 same instructions.
 
+## Models and effort (same rules as the harness, docs/ORCHESTRATION.md §1)
+
+- **Main session:** the everyday strong model at medium effort. The frontier model is for a separate architecture
+  or analysis session, not for running a milestone.
+- **Never switch the model inside a long session.** The prompt cache belongs to a model: a switch rewrites the whole
+  context once at full price. Start a new session and hand over with `docs/PLAN-1.0.md`, `roadmap.yaml` and the
+  branch names.
+- **Effort before model.** A subagent that fell short is retried with the reviewer's findings at a higher effort;
+  only then on the next model, starting at a lower effort. Self-verification (a test, a build, a script) comes
+  before both.
+- **Small models are single-shot.** `scout` and `compressor` answer one question; they do not run long tool loops.
+- **A team only where there is breadth.** One dependent chain, or work that fits one context, goes to one
+  `executor` from test to green CI. Fan out only independent pieces.
+- **Independence over price in review.** The `critic` runs in a fresh context and never reviews what it wrote; a
+  stronger model is not a substitute for a second look.
+
 ## Protocol for the main session
 
 1. **Refine first** when a request is ambiguous or large: `prompt-refiner` → contract; work from the contract.
@@ -63,6 +79,22 @@ Adapted in our own words from Robert C. Martin's ub-mode (github.com/unclebob/ub
    function (radon complexity + coverage), no duplicate blocks (pylint duplicate-code), mutation run (mutmut) with no
    surviving mutants left unexplained in `scripts/mutation_explained.txt`. Total coverage may not fall below
    `scripts/coverage_threshold.txt`, which only goes up.
+
+## Token budget (development sessions)
+
+Measured 2026-11-05: about 85% of a session's tokens went to the main session re-reading a long context on many
+small turns. Quality rules above stay; this is about who spends which tokens.
+
+- The main session decides, reviews and merges. Every unit of work (test, code, gates, CI) goes to one `executor`
+  on the mid tier with a Task Contract; models are always named explicitly (an agent without a model inherits the
+  main session's).
+- Waiting is one background command that wakes the session on the result (CI polling loop, gates run), never
+  repeated short turns.
+- Screenshots are looked at by the agent that made them; the main session gets text and opens only final images.
+- Temporary gate files (`setup.cfg`, `mutants/`) are git-ignored; nobody commits or reports them.
+- After a merge or a finished milestone, start a fresh session or compact instead of carrying the whole history.
+- Before and after a milestone, measure: tokens by session and agent from the transcripts, written into the
+  milestone's PR description.
 
 ## Project rules
 

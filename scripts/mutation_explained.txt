@@ -23,3 +23,5 @@ artel/roadmap_html.py:278: equivalent mutants on moved code: .get default for "o
 artel/roadmap_html.py:279: equivalent mutant on moved code: `.get("stars") or 0` default, every metrics block has stars
 artel/roadmap_html.py:330: equivalent mutants on moved code: .get("features", []) default and the defaultdict factory
 artel/roadmap_html.py:339: equivalent mutant on moved code: hs.get("snapshot", "") default, harnesses.yaml always has a snapshot
+artel/agent_env.py:177: equivalent mutant, target = False -> None initial value: target is only read for truthiness (elif target) and is assigned before the other read (not target)
+artel/agent_env.py:184: equivalent mutant, target = False -> None after a redirect target: target is only read for truthiness, None and False behave the same
