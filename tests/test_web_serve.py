@@ -171,3 +171,15 @@ def test_serve_ctrl_c_message_and_cleanup(monkeypatch, capsys):
     server.serve(config={})
     assert capsys.readouterr().out == ("\nArteliq остановлен. Незавершённые проекты (2) продолжатся кнопкой "
                                        "«Продолжить» после следующего `arteliq web`.\n")
+
+
+def test_announce_flushes_every_line_so_the_token_shows_at_once(monkeypatch):
+    calls = []
+    monkeypatch.setattr("builtins.print", lambda *a, **k: calls.append((a, k)))
+    for token in ("T", None):
+        calls.clear()
+        server._announce("127.0.0.1", 9, True, token)
+        assert len(calls) == 4 and all(k == {"flush": True} for _, k in calls)
+    calls.clear()
+    server._announce("127.0.0.1", 9, False, None)
+    assert len(calls) == 1 and calls[0][1] == {"flush": True}
