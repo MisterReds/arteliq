@@ -606,6 +606,7 @@ S-cloud-1 — один прогон в облачном контейнере б�
 
 ## Архитектура и план
 
+- [`docs/PLAN-1.0.md`](docs/PLAN-1.0.md) — анализ на 2026-11-10 и план до версии 1.0; ход работ — [`docs/ROADMAP.md`](docs/ROADMAP.md).
 - [`docs/SPEC.md`](docs/SPEC.md) — ТЗ: цели, приоритеты, поставки 0–9. Выполнены поставки 0, 1, 2, срочные исправления аудита, поставка 3 (этапы A и B), инженерные ворота,
   чат «Спросить», просмотр файлов, запуск результата и приложение на компьютере (шаг 1).
 - [`docs/TARGET_ARCHITECTURE.md`](docs/TARGET_ARCHITECTURE.md) — целевая архитектура.
@@ -639,3 +640,7 @@ S-cloud-1 — один прогон в облачном контейнере б�
 `--update-baseline --allow-add`. Порог покрытия лежит в `scripts/coverage_threshold.txt` и может только расти
 (`python3 scripts/coverage_gate.py raise coverage.json`). Мутанты, которые выжили и объяснены, перечисляются в
 `scripts/mutation_explained.txt` (`файл:строка: причина`).
+
+## Лицензия
+
+Apache License 2.0 — см. [LICENSE](LICENSE).

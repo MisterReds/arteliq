@@ -43,6 +43,16 @@ pillars:
     status: done
     where: [artel/evolve/]
 
+waves:
+  10: "M0 · Чистый стол"
+  11: "M1 · Доказательство S"
+  12: "M2 · Профили качества (П10)"
+  13: "M3 · Ядро: каталог моделей, FSM, сторож (П4, П6)"
+  14: "M4 · Управление и внимание владельца (П7)"
+  15: "M5 · Долгий горизонт: приложения над оболочкой, L, провайдеры (П8, U2, U7)"
+  16: "M6 · Выпуск 1.0 (П9)"
+  20: "После 1.0"
+
 items:
   # ---- built by hand outside the waves (product and reliability) ----
   - {id: D-self-update, wave: 0, mode: design, status: done, title: "Self-update from the dashboard and CLI, verified by the pillar tests before switching, rollback", source: {harness: Arteliq, repo: MisterReds/arteliq}, target: [artel/updater.py]}
@@ -68,7 +78,7 @@ items:
       call embeds a bounded number of new chunks and warms the rest in the background.
     acceptance: [tests/test_embeddings.py, a Russian query finds an English document by meaning, retrieval never fails without a model]
   - id: D-multimodal-retrieval
-    wave: 0
+    wave: 20
     mode: design
     status: planned
     title: "Multimodal memory: images, audio and video in deliverables and across projects; fully local RAG with Gemma 4"
@@ -328,9 +338,10 @@ items:
     target: [artel/plugins/runtimes.py]
   - id: W3-durable
     priority: core
-    wave: 3
+    wave: 13
     mode: design
     status: planned
+    note: "Folded into M3-watchdog-resume (PLAN-1.0)."
     title: Durable turns and idempotent run receipts — resume mid-turn after a crash
     source: {harness: Pi / OpenScience, repo: badlogic/pi-mono, paths: [packages/durable/README.md]}
     target: [artel/agent.py, artel/board.py]
@@ -343,10 +354,10 @@ items:
     source: {harness: Pi, repo: badlogic/pi-mono, paths: [packages/coding-agent/docs/extensions.md, packages/coding-agent/docs/packages.md]}
     target: [artel/kernel.py, artel/packages.py, artel/manager.py, artel/runtimes/__init__.py, artel/web/]
   - id: W3-state-machine
-    wave: 3
-    mode: evolve
+    wave: 13
+    mode: design
     status: planned
-    note: "Study 2026-10: AgentTeams docs/design/teamharness/task-transition-engine.md and plugins/teamharness/contracts/task-transitions.json keep the table as a JSON contract file, route every change through one _transition_task entry, append a capped per-task history {ts, from, to, action, actor}, and reject out-of-order moves with an error naming the correct action."
+    note: "Study 2026-10: AgentTeams docs/design/teamharness/task-transition-engine.md and plugins/teamharness/contracts/task-transitions.json keep the table as a JSON contract file, route every change through one _transition_task entry, append a capped per-task history {ts, from, to, action, actor}, and reject out-of-order moves with an error naming the correct action. Folded into P6-fsm-orchestrator (PLAN-1.0)."
     title: Task as a state machine with executable transition gates
     source: {harness: StateM, repo: henryqin1997/statem, paths: [README.md]}
     target: [artel/manager.py]
@@ -356,7 +367,7 @@ items:
       verdict and green gates). The manager applies transitions only through the table; invalid transitions raise.
     acceptance: [every board move goes through the table (test over a full run), pillar invariants still pass, no benchmark regression]
   - id: W3-fresh-context-steps
-    wave: 3
+    wave: 20
     mode: evolve
     status: planned
     title: Fresh context per step, verified state outside the context
@@ -369,9 +380,10 @@ items:
     acceptance: [tasks over N turns run in steps with a progress file, pass rate on long tasks does not drop, tokens per long task drop]
   - id: W3-plan-review
     priority: core
-    wave: 3
-    mode: evolve
+    wave: 11
+    mode: design
     status: planned
+    note: "Folded into M1-expensive-diet (PLAN-1.0)."
     title: Plan review before execution; built-in Explore / Plan / Verification subagents
     source: {harness: Fusion / Claude Code, repo: lintsinghua/claude-code-book, paths: [en/Part-3-Advanced-Patterns/09-Sub-Agents-and-the-Fork-Pattern.md]}
     target: [artel/manager.py]
@@ -382,9 +394,10 @@ items:
     acceptance: [plan review events for every project, fewer audit rounds and replans on the benchmark, no cost increase over 10%]
   - id: W3-two-phase-memory
     priority: core
-    wave: 3
-    mode: evolve
+    wave: 14
+    mode: design
     status: planned
+    note: "Folded into P7-knowledge-scopes (PLAN-1.0)."
     title: Two-phase memory — per-run extraction with secret redaction, then consolidation
     source: {harness: Codex, repo: openai/codex, paths: [codex-rs/memories/README.md]}
     target: [artel/manager.py]
@@ -394,10 +407,10 @@ items:
       facts. Memory is shown on the worker card.
     acceptance: [no secret patterns ever reach MEMORY.md (test), memory stays under a size cap, no benchmark regression]
   - id: W3-tree-budget
-    wave: 3
-    mode: evolve
+    wave: 13
+    mode: design
     status: planned
-    note: "Study 2026-10: Munder Difflin src/main/breaker.ts escalates one level per check (steer -> constrain -> stop, recovering a level per healthy check) on token velocity, error storms and no workspace progress; budgets should count work tokens, see A-munder-work-tokens."
+    note: "Study 2026-10: Munder Difflin src/main/breaker.ts escalates one level per check (steer -> constrain -> stop, recovering a level per healthy check) on token velocity, error storms and no workspace progress; budgets should count work tokens, see A-munder-work-tokens. Folded into P6-fsm-orchestrator (PLAN-1.0)."
     title: Budget for the whole agent tree with threshold reminders
     source: {harness: Codex, repo: openai/codex, paths: [codex-rs/core/src/rollout_budget.rs]}
     target: [artel/agent.py]
@@ -406,7 +419,7 @@ items:
       Reminders to the running agents at 50 / 80 / 95 %; at 100 % the project pauses (paused_budget) with a clear note.
     acceptance: [budget events at thresholds, project pauses at 100 % and resumes with a raised budget, no benchmark regression]
   - id: W3-mailbox
-    wave: 3
+    wave: 20
     mode: evolve
     status: planned
     note: "Study 2026-10: Munder Difflin src/main/hive.ts has agents write only to their own outbox while a single router delivers to inboxes (one committer, no index.lock races) and wakes an idle recipient with an inbox nudge."
@@ -419,7 +432,7 @@ items:
     acceptance: [messages delivered and logged, a two-worker scripted scenario uses the mailbox, no benchmark regression]
   - id: W3-automations
     priority: core
-    wave: 3
+    wave: 20
     mode: evolve
     status: planned
     title: Automations — schedule and event triggers
@@ -429,18 +442,6 @@ items:
       Schedules and event triggers for goals: run a goal every day at a time (in the user's time zone), or when a
       project finishes, or on a webhook. Managed on a dashboard page; each firing creates a normal project.
     acceptance: [cron and event triggers create projects (tests), time zone respected, triggers listed and editable in the dashboard]
-  - id: W3-system-one
-    wave: 3
-    mode: design
-    status: planned
-    title: Our own System One from the partner team, connected through the System One contract (docs/SYSTEM_ONE.md)
-    source: {harness: partner team, repo: pending, paths: [docs/SYSTEM_ONE.md]}
-    target: [artel/decide.py]
-    plan: >-
-      The Jev model and the local llama.cpp runner were removed; Arteliq keeps the typed decision contract and four
-      decision points. When the partner repository is ready: connect it (plugin or HTTP), turn the points on one at a
-      time and keep only those that lower cost without lowering the pass rate on the benchmark.
-    acceptance: [each enabled point measured with and without System One, decision latency under 500 ms]
 
   # ---- wave 3, core: what the main harnesses have and Arteliq lacks (harnesses.yaml, docs/roadmap.html) ----
   - id: C-agents-md
@@ -474,7 +475,7 @@ items:
       A browser server always runs headless or on the worker's own display, never on the owner's screen.
     acceptance: [a stdio MCP server's tool is called by a native worker (fake server test), the same server reaches Claude Code and Codex args, roles without the grant do not see it]
   - id: C-task-tool
-    wave: 3
+    wave: 20
     priority: core
     mode: design
     status: planned
@@ -488,7 +489,7 @@ items:
       planner's team: the team divides the goal, subagents keep a worker's context clean.
     acceptance: [a worker's delegate call returns a child's summary (scripted), child cost counted in the parent's budget, nested in the event log, depth limited to 2]
   - id: C-web-tools
-    wave: 3
+    wave: 20
     priority: core
     mode: evolve
     status: planned
@@ -501,7 +502,7 @@ items:
       graceful "not configured" errors. Both logged as tool calls.
     acceptance: [fetch of a local test server returns its text, search without a key returns a clear tool error, policy can forbid hosts]
   - id: C-user-hooks
-    wave: 3
+    wave: 20
     priority: core
     mode: evolve
     status: planned
@@ -514,7 +515,7 @@ items:
       logged, never fatal. Built on the existing kernel events, so plugins and hooks see the same stream.
     acceptance: [a hook blocks `rm` with its message (test), a slow hook times out without stopping the run, hooks listed on the Plugins page]
   - id: C-headless-ci
-    wave: 3
+    wave: 20
     priority: core
     mode: design
     status: planned
@@ -527,10 +528,11 @@ items:
       posts the result as a comment or a pull request; secrets only from the repository's secret store.
     acceptance: [arteliq run --json emits parseable events (test), the action runs in CI on a fixture repository, no secret ever printed]
   - id: C-lsp
-    wave: 3
+    wave: 12
     priority: core
-    mode: evolve
+    mode: design
     status: planned
+    note: "Folded into P10-quality-profiles (PLAN-1.0)."
     title: Diagnostics after every edit — language server or linter errors returned in the same turn
     source: {harness: OpenCode / Crush / Qwen Code / Aider, repo: anomalyco/opencode, paths: [packages/opencode/src/lsp], license: MIT}
     target: [artel/plugins/builtin_tools.py, artel/diagnostics.py]
@@ -540,7 +542,7 @@ items:
       result; per-language timeouts; nothing when no checker is available.
     acceptance: [a syntax error introduced by an edit is reported in the same tool result (test), no checker installed means no change]
   - id: C-repo-map
-    wave: 3
+    wave: 20
     priority: core
     mode: evolve
     status: planned
@@ -553,10 +555,11 @@ items:
       card for code tasks; cached by file mtime.
     acceptance: [map of Arteliq's own repository fits the budget and lists the task's relevant module first, cache hit on the second build]
   - id: C-rewind
-    wave: 3
+    wave: 14
     priority: core
-    mode: evolve
+    mode: design
     status: planned
+    note: "Folded into P7-controls (PLAN-1.0)."
     title: Rewind from the dashboard — every accepted step is a checkpoint a person can return a task or the deliverables to
     source: {harness: Claude Code / Cline / Gemini CLI, repo: anomalyco/opencode, paths: [packages/opencode/src/session/revert.ts], license: MIT}
     target: [artel/snapshot.py, artel/web/server.py, artel/web/index.html]
@@ -566,10 +569,11 @@ items:
       event log; restoring never deletes later checkpoints.
     acceptance: [restore returns the files to the checkpoint and is itself undoable, shown in the timeline]
   - id: C-methodology-skills
-    wave: 3
+    wave: 12
     priority: core
-    mode: evolve
+    mode: design
     status: planned
+    note: "Folded into P10-fix-discipline (PLAN-1.0)."
     title: Bundled methodology skills — brainstorm, bite-sized plan, TDD, verification, systematic debugging, spec
     source: {harness: Superpowers / Spec Kit, repo: obra/superpowers, paths: [skills], license: MIT}
     target: [artel/data/skills/, artel/skills.py]
@@ -579,10 +583,11 @@ items:
       on the benchmark like any change; a skill that does not help is archived, not kept.
     acceptance: [skills present with license notes, benchmark not worse, planner index lists them first for code goals]
   - id: C-spec-artifacts
-    wave: 3
+    wave: 14
     priority: core
     mode: design
     status: planned
+    note: "Folded into P7-intent (PLAN-1.0)."
     title: Spec artifacts — constitution and spec per project, kept in sync with the plan and audited against
     source: {harness: Spec Kit / OpenSpec / MetaGPT, repo: github/spec-kit, license: MIT}
     target: [artel/manager.py, artel/prompts.py, artel/web/index.html]
@@ -592,7 +597,7 @@ items:
       requirement by requirement; changes to the goal produce a spec delta instead of a rewrite.
     acceptance: [spec written before tasks, auditor verdict lists requirements met / unmet, shown on the project page]
   - id: C-user-profile
-    wave: 3
+    wave: 20
     priority: core
     mode: evolve
     status: planned
@@ -604,7 +609,7 @@ items:
       additions from the owner's comments and answers, the owner approves them in the dashboard; never stores secrets.
     acceptance: [a preference in USER.md changes outputs (scripted), proposals need approval, secret-looking lines rejected]
   - id: C-channels
-    wave: 3
+    wave: 20
     priority: core
     mode: evolve
     status: planned
@@ -616,7 +621,7 @@ items:
       notifications), implement Slack (Socket Mode) and Discord bots on it; tokens only from environment variables.
     acceptance: [Telegram behaviour unchanged (existing tests), Slack and Discord adapters pass the same contract tests with fake APIs]
   - id: C-exec-backends
-    wave: 3
+    wave: 20
     priority: core
     mode: design
     status: planned
@@ -629,7 +634,7 @@ items:
       command policy apply in every backend.
     acceptance: [the same scripted task passes on local and docker backends, grants enforced inside the container]
   - id: C-worker-screen
-    wave: 3
+    wave: 20
     priority: core
     mode: design
     status: planned
@@ -647,7 +652,7 @@ items:
       and keeps the screenshots in the worker's folder; the screen stops when the worker is idle.
     acceptance: [two workers in one project get different displays and cannot see each other's windows (test), the owner's DISPLAY is never used even when set (test), a worker finds a button by screenshot and clicks it on its own display (scripted), live view in the dashboard]
   - id: C-best-of-n
-    wave: 3
+    wave: 20
     priority: core
     mode: design
     status: planned
@@ -660,7 +665,7 @@ items:
       capped by the budget.
     acceptance: [two attempts run in parallel and only the chosen one is merged (test), cost of both recorded]
   - id: C-evolution-archive
-    wave: 3
+    wave: 20
     priority: core
     mode: design
     status: planned
@@ -672,18 +677,6 @@ items:
       non-champion variant that is best on some tasks (quality-diversity), so improvements that first cost a little
       are not lost. Merging into main still requires no regression against the champion.
     acceptance: [archive persisted and shown on the Evolution page, a candidate branched from a non-champion parent can be adopted]
-  - id: C-acp-server
-    wave: 3
-    priority: core
-    mode: design
-    status: planned
-    title: Arteliq as an ACP agent — drive the whole team from Zed, JetBrains or any ACP client
-    source: {harness: Gemini CLI / Claude Code / goose (IDE integration), repo: agentclientprotocol/agent-client-protocol, license: Apache-2.0}
-    target: [artel/acp_server.py, artel/cli.py]
-    plan: >-
-      `artel acp` speaks ACP over stdio: a prompt becomes a goal, plan and task progress stream back as updates,
-      file edits are reported as diffs, permission requests map to Arteliq's human questions.
-    acceptance: [an ACP test client starts a goal and receives plan and completion updates]
 
   - id: C-rea-pack
     wave: 3
@@ -705,7 +698,7 @@ items:
     acceptance: [a worker answers a question about a sample JS bundle through REA's MCP tools (integration test with a fixture), the pack is invisible to roles without it, nothing is installed until the pack is enabled]
   # ---- wave 4: studied affaan-m/ECC (2026-10) ----
   - id: A-ecc-paired-promotion
-    wave: 4
+    wave: 20
     mode: design
     status: planned
     title: 'Free hypotheses win only on paired repeats: minimum samples, mean delta and per-task win rate'
@@ -732,9 +725,10 @@ items:
     - decision ledger entries carry sample_count, mean_delta and win_rate
     - test_failing_tests_reject_candidate and test_population_* still pass
   - id: A-ecc-run-heartbeat-watchdog
-    wave: 4
-    mode: evolve
+    wave: 13
+    mode: design
     status: planned
+    note: "Folded into M3-watchdog-resume (PLAN-1.0)."
     title: 'Silent-run watchdog: a CLI worker with no stream events for N minutes is killed and retried as ''hung'''
     source:
       harness: ECC
@@ -762,9 +756,10 @@ items:
 
   # ---- wave 4: studied Runfusion/Fusion (2026-10) ----
   - id: A-fusion-file-scope-lease
-    wave: 4
-    mode: evolve
+    wave: 13
+    mode: design
     status: planned
+    note: "Folded into P6-fsm-orchestrator (PLAN-1.0)."
     title: 'File-scope leases: tasks declare the paths they write; overlapping tasks never run at the same time'
     source:
       harness: Fusion
@@ -790,9 +785,10 @@ items:
     - disjoint scopes still run in parallel
     - no benchmark regression
   - id: A-fusion-novelty-loop-window
-    wave: 4
-    mode: evolve
+    wave: 13
+    mode: design
     status: planned
+    note: "Folded into M3-watchdog-resume (PLAN-1.0)."
     title: 'Loop detector catches alternating loops: low-novelty window over recent tool-call fingerprints'
     source:
       harness: Fusion
@@ -814,7 +810,7 @@ items:
     - existing loop-detector tests pass
     - no benchmark regression
   - id: A-fusion-external-obstacle-classes
-    wave: 4
+    wave: 20
     mode: evolve
     status: planned
     title: 'Failure classes for network and host problems: transient network retries free, full disk goes to a person'
@@ -837,7 +833,7 @@ items:
     - a scripted network error does not increase attempts
     - no benchmark regression
   - id: A-fusion-review-dispute
-    wave: 4
+    wave: 20
     mode: evolve
     status: planned
     title: Workers can dispute a review finding; the next reviewer must rule on each dispute
@@ -863,9 +859,10 @@ items:
 
   # ---- wave 4: studied bytedance/deer-flow (2026-10) ----
   - id: A-deerflow-typed-criteria
-    wave: 4
-    mode: evolve
+    wave: 12
+    mode: design
     status: planned
+    note: "Folded into P10-quality-profiles (PLAN-1.0)."
     title: Machine-checkable acceptance criteria (file exists / non-empty / json-valid, tests_passed:<cmd>) decided
       in code
     source:
@@ -892,9 +889,10 @@ items:
 
   # ---- wave 4: studied aden-hive/hive (2026-10) ----
   - id: A-hive-chat-reply
-    wave: 4
+    wave: 14
     mode: design
     status: planned
+    note: "Folded into P7-attention-outbox (PLAN-1.0)."
     title: 'Answer a waiting task from the phone: Telegram reply routed back to the task by an HMAC reference'
     source:
       harness: Hive
@@ -920,9 +918,10 @@ items:
     - pending escalations survive a restart
     - no token stored in plain text logs
   - id: A-hive-escalation-filter
-    wave: 4
-    mode: evolve
+    wave: 14
+    mode: design
     status: planned
+    note: "Folded into P7-attention-outbox (PLAN-1.0)."
     title: 'Filter spurious ''ask a human'' blocks: a cheap check sends permission-seeking back to work'
     source:
       harness: Hive
@@ -947,9 +946,10 @@ items:
 
   # ---- wave 4: studied agentscope-ai/AgentTeams (2026-10) ----
   - id: A-agentteams-secret-free-env
-    wave: 4
-    mode: evolve
+    wave: 14
+    mode: design
     status: planned
+    note: "Folded into P7-secrets (PLAN-1.0)."
     title: 'Workers never see provider secrets: tool and CLI environments are scrubbed of keys and tokens'
     source:
       harness: AgentTeams
@@ -976,9 +976,10 @@ items:
 
   # ---- wave 4: studied Yeachan-Heo/oh-my-claudecode (2026-10) ----
   - id: A-omc-clarify-gate
-    wave: 4
-    mode: evolve
+    wave: 14
+    mode: design
     status: planned
+    note: "Folded into P7-intent (PLAN-1.0)."
     title: 'Clarify vague goals before planning: ambiguity score, up to three questions to the owner'
     source:
       harness: oh-my-claudecode
@@ -1001,7 +1002,7 @@ items:
     - answers reach the planner prompt
     - no benchmark change (gate skipped below threshold)
   - id: A-omc-review-tiers
-    wave: 4
+    wave: 20
     mode: evolve
     status: planned
     title: 'Review effort scaled to the change: light review for small diffs, full review for large or sensitive ones'
@@ -1023,9 +1024,10 @@ items:
     - tier recorded on review/verdict events
     - benchmark cost drops with no pass-rate drop
   - id: A-omc-secret-redaction
-    wave: 4
-    mode: evolve
+    wave: 14
+    mode: design
     status: planned
+    note: "Folded into P7-secrets (PLAN-1.0)."
     title: Redact secrets from the event log, tool results and notifications
     source:
       harness: oh-my-claudecode
@@ -1047,9 +1049,10 @@ items:
 
   # ---- wave 4: studied chaitanyagiri/munder-difflin (2026-10) ----
   - id: A-munder-work-tokens
-    wave: 4
+    wave: 3
     mode: evolve
-    status: planned
+    status: done
+    result: "usage shape in/out/cached; budgets count in+out (stage B)"
     title: 'Count cache reads separately: budgets on work tokens, costs with cache prices'
     source:
       harness: Munder Difflin
@@ -1072,3 +1075,406 @@ items:
     - usage carries four counters (test)
     - a run with large cache reads does not trip the token budget (test)
     - dashboard token totals match the provider's billed categories
+
+  # ---- M0: M0 · Чистый стол (docs/PLAN-1.0.md) ----
+  - id: M0-check-parse
+    wave: 10
+    mode: design
+    status: done
+    result: "merged b6f8451"
+    title: "Quote-aware parsing of plan checks (no false \"missing programs\", no needless expensive replan)"
+    source: {harness: Arteliq, repo: MisterReds/arteliq, paths: [docs/SPEC.md]}
+    acceptance: ["branch fix/check-program-parse merged with green CI"]
+  - id: M0-run-lock
+    wave: 10
+    mode: design
+    status: in_progress
+    title: "Cross-process run lock: a project runs in one process; the dashboard shows \"running elsewhere\" and refuses resume"
+    source: {harness: Arteliq, repo: MisterReds/arteliq, paths: [docs/SPEC.md]}
+    acceptance: ["subprocess test: second run refused, resume returns 409, lock freed on process death"]
+  - id: M0-release
+    wave: 10
+    mode: design
+    status: in_progress
+    title: "First public release: PyPI 0.1.0, licence file, repository description and topics"
+    source: {harness: Arteliq, repo: MisterReds/arteliq, paths: [docs/SPEC.md]}
+    acceptance: ["pip install arteliq works on a clean machine; LICENSE present"]
+  - id: M0-ci-flakes
+    wave: 10
+    mode: design
+    status: planned
+    title: Root causes of the two unexplained CI failures (Windows test_remote WinError 10053; macOS 3.13)
+    source: {harness: Arteliq, repo: MisterReds/arteliq, paths: [docs/SPEC.md]}
+    acceptance: ["each reproduced by a test and fixed at the cause"]
+  - id: M0-dev-budget
+    wave: 10
+    mode: design
+    status: done
+    result: "rules in CLAUDE.md; /setup.cfg and mutants/ ignored"
+    title: Development token budget rules in CLAUDE.md; gate temp files ignored
+    source: {harness: Arteliq, repo: MisterReds/arteliq, paths: [docs/SPEC.md]}
+    acceptance: ["rules written; setup.cfg and mutants/ in .gitignore"]
+
+  # ---- M1: M1 · Доказательство S (docs/PLAN-1.0.md) ----
+  - id: M1-expensive-diet
+    wave: 11
+    mode: design
+    status: planned
+    title: "Planning and acceptance by orchestration v2: plan on the mid profile checked by a code plan lint; acceptance by another provider as a project step; no strong-model plan review"
+    source: {harness: Arteliq, repo: MisterReds/arteliq, paths: [docs/SPEC.md]}
+    after: [M0-check-parse]
+    acceptance: ["S makes no strong-tier call unless a task escalates; a plan with an uncovered criterion or a missing program is returned once by the lint"]
+  - id: M1-thresholds
+    wave: 11
+    mode: design
+    status: planned
+    title: "Re-specify U3 and U4: absolute expensive cap for S, share for L; U4 against the control arm"
+    source: {harness: Arteliq, repo: MisterReds/arteliq, paths: [docs/SPEC.md]}
+    acceptance: ["SPEC §1 and bench/acceptance/S.yaml updated on the owner's decision"]
+  - id: M1-preflight
+    wave: 11
+    mode: design
+    status: planned
+    title: "Acceptance preflight: interpreter, sandbox backend, both runtimes, expected runtime per role"
+    source: {harness: Arteliq, repo: MisterReds/arteliq, paths: [docs/SPEC.md]}
+    acceptance: ["a run with a missing prerequisite stops before spending tokens and names it"]
+  - id: M1-control-arm
+    wave: 11
+    mode: design
+    status: planned
+    title: "Three arms on one scenario and budget: one agent session without Arteliq, solo, team; goal with independent verdict, owner interventions, p50/p95 time, tokens by profile"
+    source: {harness: Arteliq, repo: MisterReds/arteliq, paths: [docs/SPEC.md]}
+    acceptance: ["arteliq acceptance writes the three columns to the registry; tokens per task are reported, not used as the criterion for the team"]
+  - id: M1-s-x3
+    wave: 11
+    mode: design
+    status: planned
+    title: "S three times in a row on the owner's machine with a cross-provider verdict"
+    source: {harness: Arteliq, repo: MisterReds/arteliq, paths: [docs/SPEC.md]}
+    after: [M1-expensive-diet, M1-preflight, M1-control-arm]
+    acceptance: ["three consecutive passes on one version recorded in REGISTRY.md"]
+
+  # ---- M2: M2 · Профили качества (П10) (docs/PLAN-1.0.md) ----
+  - id: P10-quality-profiles
+    wave: 12
+    mode: design
+    status: planned
+    title: "Quality profiles: catalogue by result type and level, checks generated from the profile, reviewer checklist"
+    source: {harness: Arteliq, repo: MisterReds/arteliq, paths: [docs/SPEC.md]}
+    after: [M1-s-x3]
+    acceptance: ["reference project passes and its broken twin fails per profile"]
+  - id: P10-fix-discipline
+    wave: 12
+    mode: design
+    status: planned
+    title: Fix discipline for workers and reviewer (failing test as evidence); manager attacks the premise after a repeated failure
+    source: {harness: Arteliq, repo: MisterReds/arteliq, paths: [docs/SPEC.md]}
+    acceptance: ["a fix without a failing-test proof is rejected; a second same-cause failure checks the environment first"]
+
+  # ---- M3: M3 · Ядро: каталог моделей, FSM, сторож (П4, П6) (docs/PLAN-1.0.md) ----
+  - id: P4-model-catalog
+    wave: 13
+    mode: design
+    status: planned
+    title: Model catalogue and capability profiles in config; select_model is a pure function; no vendor names in logic
+    source: {harness: Arteliq, repo: MisterReds/arteliq, paths: [docs/SPEC.md]}
+    after: [P10-quality-profiles]
+    acceptance: ["archcheck vendor baseline empty; one role picks different models on two catalogues without a code change"]
+  - id: P6-fsm-orchestrator
+    wave: 13
+    mode: design
+    status: planned
+    title: Task and project state machine with an effect-only orchestrator; team scheduling per profession; Manager removed
+    source: {harness: Arteliq, repo: MisterReds/arteliq, paths: [docs/SPEC.md]}
+    after: [P4-model-catalog]
+    acceptance: ["a test per transition; no class over 300 lines; six ready tasks with max_parallel 3 run three at a time"]
+  - id: M3-watchdog-resume
+    wave: 13
+    mode: design
+    status: planned
+    title: Project watchdog for progress and drift; resume after a crash or machine sleep without repeating side effects
+    source: {harness: Arteliq, repo: MisterReds/arteliq, paths: [docs/SPEC.md]}
+    acceptance: ["a killed manager resumes mid-project; a stalled worker is retried or escalated"]
+  - id: M3-arch-zero
+    wave: 13
+    mode: design
+    status: planned
+    title: "Empty archcheck baselines: import cycles and module-level mutable state removed"
+    source: {harness: Arteliq, repo: MisterReds/arteliq, paths: [docs/SPEC.md]}
+    acceptance: ["scripts/archcheck_baseline.json has no cycles or globals entries"]
+
+  # ---- M4: M4 · Управление и внимание владельца (П7) (docs/PLAN-1.0.md) ----
+  - id: P7-intent
+    wave: 14
+    mode: design
+    status: planned
+    title: Intent with versions and owner confirmation in the dashboard and Telegram
+    source: {harness: Arteliq, repo: MisterReds/arteliq, paths: [docs/SPEC.md]}
+    after: [P6-fsm-orchestrator]
+    acceptance: ["a project starts work only after the confirmed Intent; a change makes a new version"]
+  - id: P7-decision-log
+    wave: 14
+    mode: design
+    status: planned
+    title: "Decision Log: every manager decision records why and what next"
+    source: {harness: Arteliq, repo: MisterReds/arteliq, paths: [docs/SPEC.md]}
+    acceptance: ["decision_log_coverage is 100% on S"]
+  - id: P7-controls
+    wave: 14
+    mode: design
+    status: planned
+    title: "Pause, step rollback, autonomy modes off/observe/auto, budget from the dashboard — as state machine events"
+    source: {harness: Arteliq, repo: MisterReds/arteliq, paths: [docs/SPEC.md]}
+    acceptance: ["a scenario test per command; rollback restores files byte for byte"]
+  - id: P7-knowledge-scopes
+    wave: 14
+    mode: design
+    status: planned
+    title: "Knowledge by scope: project, shared library (read-only for agents), owner skills; promotion on evidence"
+    source: {harness: Arteliq, repo: MisterReds/arteliq, paths: [docs/SPEC.md]}
+    acceptance: ["a skill from project A does not change running project B"]
+  - id: P7-attention-outbox
+    wave: 14
+    mode: design
+    status: planned
+    title: Requests to the owner as structured Attention records; outgoing messages through an outbox with receipts
+    source: {harness: Arteliq, repo: MisterReds/arteliq, paths: [docs/SPEC.md]}
+    acceptance: ["no question exists only as prose in a report; no duplicate notifications"]
+  - id: P7-secrets
+    wave: 14
+    mode: design
+    status: planned
+    title: "Secrets never enter model context; secrets redacted from the event log, tool results and notifications"
+    source: {harness: Arteliq, repo: MisterReds/arteliq, paths: [docs/SPEC.md]}
+    acceptance: ["a planted key is absent from the log, the prompts and Telegram"]
+  - id: P7-proactive-observe
+    wave: 14
+    mode: design
+    status: planned
+    title: "Proactive work in observe mode: rules from the owner, a 'would have done' record with a cost forecast in the Decision Log, a separate hard budget"
+    source: {harness: Arteliq, repo: MisterReds/arteliq, paths: [docs/SPEC.md]}
+    after: [P7-decision-log, P7-controls]
+    acceptance: ["a rule in observe writes the intended action and its forecast and executes nothing; the budget cap stops it"]
+
+  # ---- M5: M5 · Долгий горизонт: приложения над оболочкой, L, провайдеры (П8, U2, U7) (docs/PLAN-1.0.md) ----
+  - id: P8-apps-over-shell
+    wave: 15
+    mode: design
+    status: planned
+    title: "Dashboard routes, CLI and Telegram over the shell API; no direct imports of core or adapters"
+    source: {harness: Arteliq, repo: MisterReds/arteliq, paths: [docs/SPEC.md]}
+    after: [P7-controls]
+    acceptance: ["archcheck layer rule; dashboard tests; both UI modes"]
+  - id: M5-l-run
+    wave: 15
+    mode: design
+    status: planned
+    title: "Scenario L: six hours or more on the owner's machine without a limit stop"
+    source: {harness: Arteliq, repo: MisterReds/arteliq, paths: [docs/SPEC.md]}
+    after: [M3-watchdog-resume, P7-controls]
+    acceptance: ["L passes U1-U6"]
+  - id: M5-u7
+    wave: 15
+    mode: design
+    status: planned
+    title: S on the second provider and with a local model as executor
+    source: {harness: Arteliq, repo: MisterReds/arteliq, paths: [docs/SPEC.md]}
+    after: [P4-model-catalog]
+    acceptance: ["three of three"]
+
+  # ---- M6: M6 · Выпуск 1.0 (П9) (docs/PLAN-1.0.md) ----
+  - id: P9-acceptance
+    wave: 16
+    mode: design
+    status: planned
+    title: "Acceptance report v2: U1-U8 against thresholds with the control arm"
+    source: {harness: Arteliq, repo: MisterReds/arteliq, paths: [docs/SPEC.md]}
+    after: [M5-l-run, M5-u7]
+    acceptance: ["SPEC §5 passed"]
+  - id: M6-docs
+    wave: 16
+    mode: design
+    status: planned
+    title: "English documentation, SECURITY.md, CONTRIBUTING, changelog; versioned data schema of the home directory with migration"
+    source: {harness: Arteliq, repo: MisterReds/arteliq, paths: [docs/SPEC.md]}
+    acceptance: ["an upgrade from 0.1 keeps projects and settings"]
+  - id: M6-security-review
+    wave: 16
+    mode: design
+    status: planned
+    title: "External review of sandbox, command policy, root wrapper and remote mode"
+    source: {harness: Arteliq, repo: MisterReds/arteliq, paths: [docs/SPEC.md]}
+    acceptance: ["findings fixed or accepted in writing"]
+  - id: M6-onboarding
+    wave: 16
+    mode: design
+    status: planned
+    title: "First run for a stranger: one command on a clean machine to a first verified result"
+    source: {harness: Arteliq, repo: MisterReds/arteliq, paths: [docs/SPEC.md]}
+    acceptance: ["CI scenario on three OSes and one outside person without reading the docs"]
+
+  # ---- after 1.0: После 1.0 (docs/PLAN-1.0.md) ----
+  - id: X-evolution-unfreeze
+    wave: 20
+    mode: design
+    status: planned
+    title: "Unfreeze evolution: candidates chosen on a working set, confirmed on a held-out set"
+    source: {harness: Arteliq, repo: MisterReds/arteliq, paths: [docs/SPEC.md]}
+    acceptance: ["candidates are picked on the working set and adopted only after the held-out confirmation"]
+  - id: X-relay-android
+    wave: 20
+    mode: design
+    status: planned
+    title: "Relay server with end-to-end encryption and the Android client, SPEC П8b"
+    source: {harness: Arteliq, repo: MisterReds/arteliq, paths: [docs/SPEC.md]}
+    acceptance: ["the Android client controls a project through the relay; the relay cannot read the traffic"]
+  - id: X-native-shell
+    wave: 20
+    mode: design
+    status: planned
+    title: "Native desktop shell with tray, only if the installed web app is not enough, SPEC П8a step 2"
+    source: {harness: Arteliq, repo: MisterReds/arteliq, paths: [docs/SPEC.md]}
+    acceptance: ["decision recorded after the installed web app is tried; the shell ships only if it is not enough"]
+  - id: X-proactive
+    wave: 20
+    mode: design
+    status: planned
+    title: "Proactive work in auto mode: verified results only, usefulness measured, a rule below the threshold switches itself off (SPEC §14)"
+    source: {harness: Arteliq, repo: MisterReds/arteliq, paths: [docs/SPEC.md]}
+    after: [P7-proactive-observe]
+    acceptance: ["proactive work stays inside its own budget and mode; off does nothing"]
+  - id: X-ui-english
+    wave: 20
+    mode: design
+    status: planned
+    title: English interface next to Russian
+    source: {harness: Arteliq, repo: MisterReds/arteliq, paths: [docs/SPEC.md]}
+    acceptance: ["every dashboard and CLI string has an English variant selectable per owner"]
+
+  # ---- orchestration v2 (docs/ORCHESTRATION.md), 2026-11-11 ----
+  - id: M1-solo-mode
+    wave: 11
+    mode: design
+    status: planned
+    title: 'Solo by default: one worker leads a low or medium goal in one session by a checklist with checks; the
+      rest becomes board tasks when the session''s context budget runs out'
+    source:
+      harness: Arteliq
+      repo: MisterReds/arteliq
+      paths:
+      - docs/ORCHESTRATION.md
+    after:
+    - M1-expensive-diet
+    acceptance:
+    - S completes in solo with the contract, discriminating checks, independent acceptance and the journal intact;
+      an exhausted context budget moves the open items to the board
+  - id: M1-effort-ladder
+    wave: 11
+    mode: design
+    status: planned
+    title: 'Escalation ladder for a task: first attempt at medium effort, retry at high effort, environment diagnosis
+      on a repeated cause, then the strong profile in a new session, then the manager'
+    source:
+      harness: Arteliq
+      repo: MisterReds/arteliq
+      paths:
+      - docs/ORCHESTRATION.md
+    acceptance:
+    - a test per step; a project with no stuck task records no strong-tier call; each step is a journal entry with
+      its reason
+  - id: M1-native-tiers
+    wave: 11
+    mode: design
+    status: planned
+    title: 'Defect: API runs put every role on the default strongest model because the native profile table is empty'
+    source:
+      harness: Arteliq
+      repo: MisterReds/arteliq
+      paths:
+      - docs/ORCHESTRATION.md
+    acceptance:
+    - with provider anthropic and no overrides a worker, a reviewer and the librarian run on their own profiles; a
+      failing test first
+
+  # ---- ongoing project work (docs/PLAN-1.0.md §10), 2026-11-11 ----
+  - id: M3-project-requests
+    wave: 13
+    mode: design
+    status: planned
+    title: 'A project lives long and holds many requests: bound to an existing folder or repository; a request runs
+      on its own branch; accepting it merges and makes a rollback point'
+    source:
+      harness: Arteliq
+      repo: MisterReds/arteliq
+      paths:
+      - docs/PLAN-1.0.md
+    after:
+    - P6-fsm-orchestrator
+    acceptance:
+    - ten requests in one project keep its history; a rejected request leaves the folder byte for byte as before;
+      rollback of an accepted request restores the previous point
+  - id: M4-connections
+    wave: 14
+    mode: design
+    status: planned
+    title: 'Connections of a project: environments, keys in the system keychain, a per-project SSH key; workers use
+      a credential without seeing its value'
+    source:
+      harness: Arteliq
+      repo: MisterReds/arteliq
+      paths:
+      - docs/PLAN-1.0.md
+    after:
+    - P7-secrets
+    acceptance:
+    - a key added through the form never appears in prompts, the journal or tool results; the connection check reports
+      a reachable host; a revoked key stops working at once
+  - id: M4-actions
+    wave: 14
+    mode: design
+    status: planned
+    title: Named project actions (run, tests, publish to an environment, logs, rollback) detected from the project
+      or saved after a first run; external and irreversible ones behind a confirmation sheet
+    source:
+      harness: Arteliq
+      repo: MisterReds/arteliq
+      paths:
+      - docs/PLAN-1.0.md
+    after:
+    - M3-project-requests
+    acceptance:
+    - publish to production cannot start without the confirmation; a saved action repeats without a model call
+  - id: M5-conversation-ui
+    wave: 15
+    mode: design
+    status: planned
+    title: 'Conversation-first interface: the request stream with result cards in the centre, preview, changes and
+      files beside it; the board and the journal as a secondary view'
+    source:
+      harness: Arteliq
+      repo: MisterReds/arteliq
+      paths:
+      - docs/PLAN-1.0.md
+    after:
+    - P8-apps-over-shell
+    - M4-actions
+    acceptance:
+    - the owner sends a request, accepts it and publishes without leaving the conversation; dashboard tests; phone
+      layout
+  - id: M5-c-run
+    wave: 15
+    mode: design
+    status: planned
+    title: 'Scenario C (ongoing project): an existing repository and a series of ten requests including a publish
+      and a rollback'
+    source:
+      harness: Arteliq
+      repo: MisterReds/arteliq
+      paths:
+      - docs/PLAN-1.0.md
+    after:
+    - M5-conversation-ui
+    - M4-connections
+    acceptance:
+    - time to result per request (p50/p95), owner messages per request, cost per request and regressions recorded
+      in the registry
