@@ -7,6 +7,7 @@ never recomputed or filled in. `null` means the run produced no value.
 |---|---|---|---|---|
 | S-baseline | S | 917c66a | interrupted: ended `waiting_human` after 0.26 h, goal audit not run, `verify: null` | `baseline/S` @ f459260, `bench/acceptance/results/S-baseline.json` |
 | S-cloud-1 | S | 7e11f7e | done after 0.09 h, 6/6 tasks, thresholds failed: expensive_token_share 0.275, expensive_call_share 0.176 (limit 0.05); `verify: null` | `bench/acceptance/results/S-cloud-1.json` |
+| S-device-1 | S | 0.1.1 (PyPI) | done after 0.09 h, 5/5 tasks; thresholds failed: expensive_token_share 0.231, expensive_call_share 0.154 (limit 0.05); `verify`: not run (verifier runtime refused, 401) | test stand report of 2026-11-11, values copied from `arteliq metrics --json --scenario S` output in that report |
 
 ## S-baseline (reference point "before" for the rewrite)
 
@@ -56,3 +57,31 @@ were split at `;`, `|` and newlines before quoting was applied, so `python3 -c "
 programs (`manager/plan_checks_unavailable`). Fixed on branch `fix/check-program-parse`. Without that run the
 expensive token share would have been about 0.19, still above the limit: one plan and one audit are a fixed cost that
 dominates a six-task project.
+
+## S-device-1 (2026-11-11, arteliq 0.1.1 from PyPI, runtime claude_code)
+
+First run on the owner's hardware after stage B: a clean Ubuntu 24.04 machine, Arteliq installed with
+`pip install arteliq`, both CLIs present. Values as printed by `arteliq metrics --json --scenario S` on that machine:
+
+| Metric | Value | Limit | ok |
+|---|---|---|---|
+| expensive_token_share_max | 0.231 | 0.05 | false |
+| expensive_call_share_max | 0.154 | 0.05 | false |
+| autonomy_min | 1.0 | 0.95 | true |
+| owner_interventions_max | 0 | 1 | true |
+| no_limit_stop | false | true | true |
+
+Other recorded values: duration_h 0.09, ended done, tasks_done 5, success_rate 1.0, steps 13, owner_asks 0,
+tokens_total 364544, tokens_per_accepted 72909, cost_usd 2.18, verdict null.
+
+Conditions and limits of this run:
+- Independent verification did not run: `arteliq acceptance verify` returned
+  `codex failed: workspace routing discovery unauthorized (401)` although the CLI reported a signed-in account.
+  U1 is therefore not shown by this run.
+- No isolation: `arteliq providers` reported that commands run without a sandbox on that machine
+  (`bwrap: setting up uid map: Permission denied`, the default restriction of unprivileged user namespaces on
+  Ubuntu 24.04).
+- The deliverable was run by hand on the machine: the README's check `bash e2e.sh` exited 0 with `E2E OK`
+  (19 operations imported and categorised).
+- The run used version 0.1.1, before the orchestration v2 changes of milestone M1; the expensive share is the
+  planner and the auditor, as in S-cloud-1.
