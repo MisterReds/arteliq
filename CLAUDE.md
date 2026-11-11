@@ -80,6 +80,22 @@ Adapted in our own words from Robert C. Martin's ub-mode (github.com/unclebob/ub
    surviving mutants left unexplained in `scripts/mutation_explained.txt`. Total coverage may not fall below
    `scripts/coverage_threshold.txt`, which only goes up.
 
+## Token budget (development sessions)
+
+Measured 2026-11-05: about 85% of a session's tokens went to the main session re-reading a long context on many
+small turns. Quality rules above stay; this is about who spends which tokens.
+
+- The main session decides, reviews and merges. Every unit of work (test, code, gates, CI) goes to one `executor`
+  on the mid tier with a Task Contract; models are always named explicitly (an agent without a model inherits the
+  main session's).
+- Waiting is one background command that wakes the session on the result (CI polling loop, gates run), never
+  repeated short turns.
+- Screenshots are looked at by the agent that made them; the main session gets text and opens only final images.
+- Temporary gate files (`setup.cfg`, `mutants/`) are git-ignored; nobody commits or reports them.
+- After a merge or a finished milestone, start a fresh session or compact instead of carrying the whole history.
+- Before and after a milestone, measure: tokens by session and agent from the transcripts, written into the
+  milestone's PR description.
+
 ## Project rules
 
 - Answers to the owner in Russian; code, comments and commits in English.
