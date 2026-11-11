@@ -979,6 +979,77 @@ def make_handler(runner: Runner, auth=None):
     return Handler
 
 
+class _DashboardServer(LocalHTTPServer):
+    runner: Runner  # set once the runner exists: the port is bound before anything else starts
+
+    def handle_error(self, request, client_address):  # an unhandled dashboard error becomes a report too
+        import traceback
+
+        tb = traceback.format_exc()
+        super().handle_error(request, client_address)
+        try:
+            from .. import reports
+
+            reports.record("exception", tb.strip().splitlines()[-1][:200], tb, config=self.runner.config)
+        except Exception:
+            pass
+
+
+def _listen_host(web: dict, host: str | None, remote: bool) -> str:
+    if remote:
+        return host or web.get("host") or "0.0.0.0"
+    host = host or "127.0.0.1"
+    if not _loopback(host):
+        raise SystemExit(f"arteliq web: {host} is beyond localhost; that needs login - use `arteliq web --remote`"
+                         " (see docs/REMOTE.md)")
+    return host
+
+
+def _bind(host: str, port: int) -> _DashboardServer:
+    """Bind first: a port that is taken must stop us before any thread starts or an access token is issued."""
+    try:
+        return _DashboardServer((host, port), BaseHTTPRequestHandler)
+    except OSError as e:
+        busy = e.errno in (errno.EADDRINUSE, 10048) or (os.name == "nt" and e.errno == errno.EACCES)  # Windows: 10013
+        if not busy:
+            raise
+        raise SystemExit(f"Порт {port} уже занят другой программой, панель не запущена. Запустите на другом порту: "
+                         f"arteliq web --port {port + 1}") from None
+
+
+def _start_background(runner: Runner, config: dict) -> None:
+    runner.start_update_loop()
+    if (config.get("evolve") or {}).get("auto_resume", True):
+        from ..evolve.supervisor import Supervisor
+        from ..project import artel_home
+
+        runner.supervisor = Supervisor(artel_home() / "evolution").start()
+    from ..telegram import TelegramBot
+    from ..telegram import token as telegram_token
+
+    if telegram_token():
+        runner.telegram = TelegramBot(runner).start()
+        code = (runner.telegram.store.data.get("pair") or {}).get("code")
+        if code:
+            print(f"Telegram: отправьте боту /pair {code} (код действует 15 минут)", flush=True)
+
+
+def _announce(host: str, port: int, remote: bool, token: str | None) -> None:
+    from ..brand import banner
+
+    print(banner(f"дашборд http://{host}:{port}" + (" (удалённый режим, вход по токену)" if remote else "")),
+          flush=True)
+    if not remote:
+        return
+    if token:  # printed to the terminal once; never written to a file or a log
+        print("Токен доступа (показывается один раз, сохраните его; хранится только хэш):\n"
+              f"  {token}", flush=True)
+    else:
+        print("Вход по ранее выпущенному токену. Новый токен (старые сессии закроются): "
+              "arteliq web token --new", flush=True)
+    print("Без HTTPS токен и сессия идут по сети открытым текстом - см. docs/REMOTE.md", flush=True)
+
+
 def serve(port: int = 8765, config: dict | None = None, host: str | None = None,
           remote: bool | None = None) -> None:
     """Local mode binds 127.0.0.1 with no login. Remote mode (flag or config `web.remote`) binds `host`
@@ -988,71 +1059,20 @@ def serve(port: int = 8765, config: dict | None = None, host: str | None = None,
     config = config or load_config()
     web = config.get("web") or {}
     remote = bool(web.get("remote")) if remote is None else remote
+    host = _listen_host(web, host, remote)
+    httpd = _bind(host, port)
     auth = token = None
     if remote:
         from .auth import Auth
 
-        host = host or web.get("host") or "0.0.0.0"
         auth = Auth(session_days=web.get("session_days", 30))
-    else:
-        host = host or "127.0.0.1"
-        if not _loopback(host):
-            raise SystemExit(f"arteliq web: {host} is beyond localhost; that needs login - use `arteliq web --remote`"
-                             " (see docs/REMOTE.md)")
-
-    class Server(LocalHTTPServer):
-        runner: Runner  # set once the runner exists; the port is bound first
-
-        def handle_error(self, request, client_address):  # an unhandled dashboard error becomes a report too
-            import traceback
-
-            tb = traceback.format_exc()
-            super().handle_error(request, client_address)
-            try:
-                from .. import reports
-
-                reports.record("exception", tb.strip().splitlines()[-1][:200], tb, config=self.runner.config)
-            except Exception:
-                pass
-
-    try:  # bind first: a taken port must stop us before threads start or an access token is issued
-        httpd = Server((host, port), BaseHTTPRequestHandler)
-    except OSError as e:
-        if e.errno not in (errno.EADDRINUSE, 10048):  # 10048 = WSAEADDRINUSE
-            raise
-        raise SystemExit(f"Порт {port} уже занят другой программой, панель не запущена. Запустите на другом порту: "
-                         f"arteliq web --port {port + 1}") from None
-    if remote:
         token = auth.ensure_token()
     runner = Runner(config)
     httpd.runner = runner
     httpd.RequestHandlerClass = make_handler(runner, auth)
-    runner.start_update_loop()
-    if (config.get("evolve") or {}).get("auto_resume", True):
-        from ..evolve.supervisor import Supervisor
-        from ..project import artel_home
-
-        runner.supervisor = Supervisor(artel_home() / "evolution").start()
-    from ..telegram import TelegramBot, token
-
-    if token():
-        runner.telegram = TelegramBot(runner).start()
-        code = (runner.telegram.store.data.get("pair") or {}).get("code")
-        if code:
-            print(f"Telegram: отправьте боту /pair {code} (код действует 15 минут)", flush=True)
+    _start_background(runner, config)
     httpd.daemon_threads = True
-    from ..brand import banner
-
-    print(banner(f"дашборд http://{host}:{port}" + (" (удалённый режим, вход по токену)" if remote else "")),
-          flush=True)
-    if remote:
-        if token:  # printed to the terminal once; never written to a file or a log
-            print("Токен доступа (показывается один раз, сохраните его; хранится только хэш):\n"
-                  f"  {token}", flush=True)
-        else:
-            print("Вход по ранее выпущенному токену. Новый токен (старые сессии закроются): "
-                  "arteliq web token --new", flush=True)
-        print("Без HTTPS токен и сессия идут по сети открытым текстом - см. docs/REMOTE.md", flush=True)
+    _announce(host, port, remote, token)
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:  # Ctrl+C is how a person stops the dashboard: say so, no traceback

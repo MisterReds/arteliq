@@ -34,5 +34,5 @@
  "artel/tools.py": 1,
  "artel/web/auth.py": 1,
  "artel/web/filesview.py": 1,
- "artel/web/server.py": 7
+ "artel/web/server.py": 4
 }
