@@ -1,7 +1,8 @@
 import ast
 import re
-import tomllib
 from pathlib import Path
+
+import tomllib
 
 ROOT = Path(__file__).resolve().parents[1]
 SPEC = ROOT / "desktop" / "sidecar" / "arteliq.spec"
@@ -23,7 +24,8 @@ def test_sidecar_spec_lists_only_existing_data_dirs():
 
 
 def test_sidecar_spec_covers_every_package_data_dir_of_the_wheel():
-    pkg_data = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["tool"]["setuptools"]["package-data"]
+    meta = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    pkg_data = meta["tool"]["setuptools"]["package-data"]
     covered = set(_spec_data_dirs())
     for package in pkg_data:
         assert package.replace(".", "/") in covered, f"{package} has package data but the sidecar spec does not ship it"
