@@ -74,8 +74,9 @@ def test_announce_local_and_remote(capsys):
                    "  SECRET\nБез HTTPS токен и сессия идут по сети открытым текстом - см. docs/REMOTE.md\n")
     server._announce(ANY, 9, True, None)
     out = capsys.readouterr().out
-    assert "SECRET" not in out and "arteliq web token --new" in out and "Вход по ранее выпущенному токену" in out
-    assert out.endswith("см. docs/REMOTE.md\n")
+    assert out == (banner_remote + "\nВход по ранее выпущенному токену. Новый токен (старые сессии закроются): "
+                   "arteliq web token --new\n"
+                   "Без HTTPS токен и сессия идут по сети открытым текстом - см. docs/REMOTE.md\n")
 
 
 class FakeHttpd:
