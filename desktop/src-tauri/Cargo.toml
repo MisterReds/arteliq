@@ -1,0 +1,17 @@
+[package]
+name = "arteliq-desktop"
+version = "0.1.1"
+description = "Arteliq desktop shell: window, tray and service lifecycle"
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-single-instance = "2"
+
+[profile.release]
+opt-level = "s"
+lto = true
+strip = true
