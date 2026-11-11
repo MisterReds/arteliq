@@ -82,7 +82,7 @@
 | M0-ci-flakes | Root causes of the two unexplained CI failures (Windows test_remote WinError 10053; macOS 3.13) | Arteliq (`MisterReds/arteliq`) | design | план |
 | M0-dev-budget | Development token budget rules in CLAUDE.md; gate temp files ignored | Arteliq (`MisterReds/arteliq`) | design | готово — rules in CLAUDE.md; /setup.cfg and mutants/ ignored |
 
-## M1 · Доказательство S — 0/9 готово
+## M1 · Доказательство S — 1/9 готово
 
 | Пункт | Что | Откуда | Режим | Статус |
 |---|---|---|---|---|
@@ -94,7 +94,7 @@
 | M1-s-x3 | S three times in a row on the owner's machine with a cross-provider verdict | Arteliq (`MisterReds/arteliq`) | design | план |
 | M1-solo-mode | Solo by default: one worker leads a low or medium goal in one session by a checklist with checks; the rest becomes board tasks when the session's context budget runs out | Arteliq (`MisterReds/arteliq`) | design | план |
 | M1-effort-ladder | Escalation ladder for a task: first attempt at medium effort, retry at high effort, environment diagnosis on a repeated cause, then the strong profile in a new session, then the manager | Arteliq (`MisterReds/arteliq`) | design | план |
-| M1-native-tiers | Defect: API runs put every role on the default strongest model because the native profile table is empty | Arteliq (`MisterReds/arteliq`) | design | план |
+| M1-native-tiers | Defect: API runs put every role on the default strongest model because the native profile table is empty | Arteliq (`MisterReds/arteliq`) | design | готово |
 
 ## M2 · Профили качества (П10) — 0/5 готово
 
@@ -206,4 +206,4 @@
 | `Yeachan-Heo/oh-my-claudecode` | MIT | 7 | A-omc-clarify-gate, A-omc-review-tiers, A-omc-secret-redaction | Claude Code plugin: team pipeline plan/prd/exec/verify/fix, deep-interview ambiguity gate, verification tiers, notifications with a reply listener and token red |
 | `chaitanyagiri/munder-difflin` | MIT | 6 | A-munder-work-tokens | Electron desktop app wrapping many terminal agent CLIs as an office: git-backed hive mailbox with a single committer, markdown memory, runaway circuit breaker ( |
 
-Итого: 37/116 пунктов готово.
+Итого: 38/116 пунктов готово.

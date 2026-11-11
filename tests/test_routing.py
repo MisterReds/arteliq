@@ -102,7 +102,7 @@ def test_a_request_cannot_talk_its_way_onto_a_cheaper_architect(tmp_path, monkey
 
 
 def test_api_runs_without_overrides_put_each_role_on_its_own_profile(tmp_path, monkeypatch):
-    cfg, p = _project(tmp_path, monkeypatch)
+    _, p = _project(tmp_path, monkeypatch)
     p.config = deep_merge(p.config, {"provider": "anthropic"})
     strongest = DEFAULT_CONFIG["models"]["default"]
     worker, reviewer = p.model_for("worker"), p.model_for("reviewer")
@@ -113,3 +113,14 @@ def test_api_runs_without_overrides_put_each_role_on_its_own_profile(tmp_path, m
     own = deep_merge(p.config, {"tiers": {"models": {"native": {"medium": "my-model"}}}})
     p.config = own
     assert p.model_for("worker") == "my-model"  # an owner override still wins
+
+
+def test_manager_and_intake_profiles_on_api_and_openai_compat_keeps_default(tmp_path, monkeypatch):
+    _, p = _project(tmp_path, monkeypatch)
+    p.config = deep_merge(p.config, {"provider": "anthropic"})
+    assert p.model_for("manager") == "claude-opus-5-5"
+    assert p.model_for("intake") == "claude-haiku-5-5"
+    assert p.model_for("tester") == "claude-sonnet-5-5"
+    p.config = deep_merge(p.config, {"provider": "openai_compat"})
+    for role in ("worker", "librarian", "manager"):
+        assert p.model_for(role) == DEFAULT_CONFIG["models"]["default"]

@@ -181,7 +181,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "models": {                          # per role; a worker persona may override
         "default": "claude-opus-5-5",
     },
-    "tiers": {                           # profile -> model for API runs (provider: anthropic); see docs/ORCHESTRATION.md §2
+    "tiers": {                           # profile -> model for API runs (provider: anthropic), ORCHESTRATION §2
         "models": {"native": {"cheap": "claude-haiku-5-5", "medium": "claude-sonnet-5-5",
                               "expensive": "claude-opus-5-5"}},
     },
