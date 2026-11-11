@@ -18,6 +18,7 @@ human stop, or every remaining path waiting on a human.
 from __future__ import annotations
 
 import contextlib
+import functools
 import json
 import os
 import re
@@ -34,7 +35,7 @@ from . import guardian, netprobe, policy, prompts
 from .agent import Outcome
 from .agent_env import agent_env, missing_programs, tool_inventory
 from .failures import classify, gate_failure_class
-from .project import INSTRUCTIONS_TRUNCATED, Persona, Project, find_instructions, persona_from_dict
+from .project import INSTRUCTIONS_TRUNCATED, Persona, Project, ProjectBusy, find_instructions, persona_from_dict
 from .runtimes import run_agent
 from .snapshot import Snapshot
 from .tooling import ToolContext, window_text
@@ -76,6 +77,25 @@ def wants_start_over(feedback: str) -> bool:
 
 def _fmt_list(items: list) -> str:
     return "\n".join(f"- {x}" for x in items) or "- (none)"
+
+
+def _owning_the_run(run):
+    """Only one manager runs a project at a time across all processes: the wrapped run holds the project's run
+    (Project.claim_run) from start to end, and raises ProjectBusy, touching nothing, when another one holds it."""
+    @functools.wraps(run)
+    def owned(self) -> str:
+        try:
+            mine = self.project.claim_run()  # False: the caller (resume) claimed it before reopening tasks
+        except ProjectBusy:
+            self.pool.shutdown(wait=False)
+            raise
+        try:
+            return run(self)
+        finally:
+            if mine:
+                self.project.release_run()
+
+    return owned
 
 
 class Manager:
@@ -1228,6 +1248,7 @@ class Manager:
             return False
         return any(t["needs_human"] for t in open_work)
 
+    @_owning_the_run
     def run(self) -> str:
         budget = self.kernel.get("budget")
         skills = self.kernel.get("skills")
@@ -1420,10 +1441,11 @@ def resume(slug: str, config: dict, stop_event: threading.Event | None = None, k
     kernel = kernel or new_kernel(config)
     try:
         project = Project.open(slug, config)
-        if via:
-            project.log.append("owner/resume", via=via)
-        continue_after_human(project)
-        return project, Manager(kernel, project, stop_event).run()
+        with project.running():  # before reopening tasks: a project another process runs is left alone
+            if via:
+                project.log.append("owner/resume", via=via)
+            continue_after_human(project)
+            return project, Manager(kernel, project, stop_event).run()
     finally:
         if own:
             kernel.shutdown(reason="run_end")
