@@ -14,6 +14,10 @@
 # in every other case it is MOVED to <dir>.bak-<time>, never deleted. Same for a venv that is not the default one.
 # Empty / "/" / $HOME / ARTEL_HOME itself / a dir holding artel.yaml or projects/ is refused. Config, projects,
 # credentials and everything else in ARTEL_HOME stay. A running background service is stopped and restarted.
+# Replace-after-success: the new clone and the new venv are built in temporary siblings (<dir>.new-PID) and checked
+# (`import artel.cli`); only then are the old ones deleted/moved aside by the rules above and the new ones put in their
+# place. If anything fails before that, the old installation is untouched and the temporary directories are removed.
+# The installer never depends on the caller's working directory (it may be the very app dir being replaced).
 
 # Installs only what Arteliq itself needs (git, Python 3.10+, GitHub access for the private repository), clones Arteliq
 # into ~/.artel/app as a git clone (so the built-in updater works), creates a virtual environment, puts `artel` on
@@ -34,7 +38,7 @@ Arteliq installer for Linux and macOS.
   --yes        do not ask for confirmation
   --remove-root  remove the root wrapper (/usr/local/sbin/artel-root) and its sudoers rule, then exit
 Piped:  gh api repos/MisterReds/arteliq/contents/install.sh -H "Accept: application/vnd.github.raw" | bash -s -- --reinstall
-Env:    ARTEL_REPO ARTEL_DIR ARTEL_VENV ARTEL_BIN ARTEL_REINSTALL=1 ARTEL_ALLOW_ROOT=1|0 (answer the root-wrapper question)
+Env:    ARTEL_REPO ARTEL_DIR ARTEL_VENV ARTEL_BIN ARTEL_PORT (dashboard port, default 8765) ARTEL_REINSTALL=1 ARTEL_ALLOW_ROOT=1|0 (answer the root-wrapper question)
 USAGE
 }
 
@@ -43,7 +47,8 @@ GH_REPO="MisterReds/arteliq"
 DIR="${ARTEL_DIR-$HOME/.artel/app}"
 VENV="${ARTEL_VENV-$HOME/.artel/venv}"
 BIN="${ARTEL_BIN:-$HOME/.local/bin}"
-CODEX=0 CLAUDE=0 SERVICE=0 START=1 YES=0 REINSTALL=0 REMOVE_ROOT=0
+PORT="${ARTEL_PORT:-8765}"
+CODEX=0 CLAUDE=0 SERVICE=0 SERVICE_STARTED=0 START=1 YES=0 REINSTALL=0 REMOVE_ROOT=0
 ROOT_WRAPPER="${ARTEL_ROOT_WRAPPER:-/usr/local/sbin/artel-root}" ROOT_SUDOERS="${ARTEL_ROOT_SUDOERS:-/etc/sudoers.d/artel}"
 ROOT_CONF="${ARTEL_ROOT_CONF:-/etc/artel-root.conf}"
 [ "${ARTEL_REINSTALL:-}" = 1 ] && REINSTALL=1
@@ -113,6 +118,16 @@ pkg_install() {  # pkg_install <generic name>...
   esac
 }
 
+port_busy() {  # is something already listening on 127.0.0.1:$PORT? (a bind attempt: nothing is started or killed)
+  "$PY" -c 'import socket, sys
+s = socket.socket()
+try:
+    s.bind(("127.0.0.1", int(sys.argv[1])))
+except OSError:
+    sys.exit(0)
+sys.exit(1)' "$PORT"
+}
+
 python_ok() { "$1" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)' 2>/dev/null; }
 find_python() { [ -n "${ARTEL_PYTHON:-}" ] && python_ok "$ARTEL_PYTHON" && { echo "$ARTEL_PYTHON"; return; }
   for p in python3.13 python3.12 python3.11 python3.10 python3; do have "$p" && python_ok "$p" && { echo "$p"; return; }; done; }
@@ -169,41 +184,88 @@ app_is_disposable() {  # 0 only when nothing in $DIR can be lost; any git failur
   return 0
 }
 
-move_aside() {  # move_aside <path> <label>: never deletes; prints where it went
-  local src="$1" dst="$1.bak-$TS"
-  [ ! -e "$dst" ] || dst="$dst-$$"
-  mv "$src" "$dst" || die "cannot move $src aside"
-  note "old $2 kept at: $dst"
-}
+# Temporary build locations (siblings, so that the final move is a rename on the same filesystem).
+SRC="$DIR" VBUILD="$VENV" STAGED=""
+cleanup_stage() { local d; for d in $STAGED; do case "$d" in *.new-$$) [ ! -e "$d" ] || rm -rf "$d" ;; esac; done; }
 
 reinstall_prepare() {
-  local svc app_action="" venv_action="" why=""
+  local why=""
   TS="$(date +%Y%m%d-%H%M%S)"
   refuse_path "app directory" "$DIR"
   refuse_path "virtual environment" "$VENV"
+  APP_ACTION="" VENV_ACTION=""
   if [ -e "$DIR" ]; then
-    if ! is_default_path "$DIR" app; then app_action=move; why="not the default location"
-    elif app_is_disposable; then app_action=delete
-    else app_action=move; why="uncommitted/ignored files, stash, unpushed commits, extra worktrees, or git could not be checked"
+    if ! is_default_path "$DIR" app; then APP_ACTION=move; why="not the default location"
+    elif app_is_disposable; then APP_ACTION=delete
+    else APP_ACTION=move; why="uncommitted/ignored files, stash, unpushed commits, extra worktrees, or git could not be checked"
     fi
   fi
   if [ -e "$VENV" ]; then
-    if [ -f "$VENV/pyvenv.cfg" ] && is_default_path "$VENV" venv; then venv_action=delete; else venv_action=move; fi
+    if [ -f "$VENV/pyvenv.cfg" ] && is_default_path "$VENV" venv; then VENV_ACTION=delete; else VENV_ACTION=move; fi
   fi
   step "Reinstall"
-  case "$venv_action" in delete) note "will remove: $VENV (virtual environment)" ;; move) note "will move aside (never deleted): $VENV -> $VENV.bak-$TS" ;; esac
-  case "$app_action" in
+  case "$VENV_ACTION" in delete) note "will remove: $VENV (virtual environment)" ;; move) note "will move aside (never deleted): $VENV -> $VENV.bak-$TS" ;; esac
+  case "$APP_ACTION" in
     delete) note "will remove: $DIR (clean app clone, nothing to lose)" ;;
     move) note "will move aside, NOT delete (${why}): $DIR -> $DIR.bak-$TS" ;;
   esac
-  note "kept untouched: everything else (config, projects, credentials, tools)"
+  note "kept untouched: everything else (config, projects, credentials, tools); the old copy is replaced only after the new one works"
   confirm "Reinstall Arteliq?" || die "cancelled"
+  SRC="$DIR.new-$$"; VBUILD="$VENV.new-$$"; STAGED="$SRC $VBUILD"
+  trap cleanup_stage EXIT
+  trap 'exit 130' INT TERM
+  [ -n "$(service_kind)" ] && SERVICE=1
+  return 0
+}
+
+# Replace text paths inside the freshly built venv: a venv is not relocatable (launcher shebangs, the editable-install pointer).
+relocate_paths() {  # relocate_paths <venv dir> <from> <to> [<from> <to>]...
+  "$PY" - "$@" <<'PYEOF'
+import os, sys
+root, pairs = sys.argv[1], [(sys.argv[i].encode(), sys.argv[i + 1].encode()) for i in range(2, len(sys.argv), 2)]
+for base, _, names in os.walk(root):
+    for n in names:
+        f = os.path.join(base, n)
+        if os.path.islink(f) or n.endswith(".pyc"):
+            continue
+        data = open(f, "rb").read()
+        new = data
+        if b"\0" not in data:
+            for old, to in pairs:
+                new = new.replace(old, to)
+        if new != data:
+            open(f, "wb").write(new)
+PYEOF
+}
+
+# The new app and venv are built and were checked in the temporary siblings: now (and only now) the old ones go.
+reinstall_commit() {
+  local svc old_app="" old_venv="" new_ok=0
+  "$VBUILD/bin/python" -c 'import artel.cli' || die "the new installation does not work; the old one is untouched"
   svc="$(service_kind)"
-  if [ "$svc" = systemd ]; then systemctl --user stop artel.service 2>/dev/null || true; SERVICE=1
-  elif [ "$svc" = launchd ]; then launchctl unload "$HOME/Library/LaunchAgents/ai.artel.dashboard.plist" 2>/dev/null || true; SERVICE=1
+  if [ "$svc" = systemd ]; then systemctl --user stop artel.service 2>/dev/null || true
+  elif [ "$svc" = launchd ]; then launchctl unload "$HOME/Library/LaunchAgents/ai.artel.dashboard.plist" 2>/dev/null || true
   fi
-  case "$app_action" in delete) rm -rf "$DIR" ;; move) move_aside "$DIR" app ;; esac
-  case "$venv_action" in delete) rm -rf "$VENV" ;; move) move_aside "$VENV" "virtual environment" ;; esac
+  case "$APP_ACTION" in delete) old_app="$DIR.old-$$" ;; move) old_app="$DIR.bak-$TS"; [ ! -e "$old_app" ] || old_app="$old_app-$$" ;; esac
+  case "$VENV_ACTION" in delete) old_venv="$VENV.old-$$" ;; move) old_venv="$VENV.bak-$TS"; [ ! -e "$old_venv" ] || old_venv="$old_venv-$$" ;; esac
+  [ -z "$old_app" ] || mv "$DIR" "$old_app" || die "cannot move $DIR aside; nothing changed"
+  if [ -n "$old_venv" ] && ! mv "$VENV" "$old_venv"; then
+    [ -z "$old_app" ] || mv "$old_app" "$DIR"
+    die "cannot move $VENV aside; nothing changed"
+  fi
+  if mv "$SRC" "$DIR" && mv "$VBUILD" "$VENV" \
+     && relocate_paths "$VENV" "$VBUILD" "$VENV" "$SRC" "$DIR" "$(canon "$VBUILD")" "$(canon "$VENV")" \
+     && (cd "$HOME" && "$VENV/bin/python" -c 'import artel.cli'); then new_ok=1; fi
+  if [ "$new_ok" != 1 ]; then  # put the old installation back; what is at the final paths now was built by this run
+    [ ! -e "$DIR" ] || [ -z "$old_app" ] || rm -rf "$DIR"
+    [ ! -e "$VENV" ] || [ -z "$old_venv" ] || rm -rf "$VENV"
+    [ -z "$old_app" ] || mv "$old_app" "$DIR"
+    [ -z "$old_venv" ] || mv "$old_venv" "$VENV"
+    die "the new installation failed its check after the swap; the old one was put back"
+  fi
+  case "$APP_ACTION" in delete) rm -rf "$old_app" ;; move) note "old app kept at: $old_app" ;; esac
+  case "$VENV_ACTION" in delete) rm -rf "$old_venv" ;; move) note "old virtual environment kept at: $old_venv" ;; esac
+  STAGED=""
 }
 
 # --- root wrapper (Linux, optional, owner's consent) ---------------------------------------------------------------
@@ -277,7 +339,15 @@ root_setup() {
   note "remove: bash install.sh --remove-root (answering no at install time removes it too)"
 }
 
+absolute() {  # absolute <path>: relative to the caller's directory as of now; empty stays empty
+  case "$1" in ""|/*) printf '%s' "$1" ;; *) printf '%s/%s' "$PWD" "$1" ;; esac
+}
+
 main() {
+# The caller's directory may be the app being replaced (or be gone): resolve relative inputs first, then leave it.
+DIR="$(absolute "$DIR")" VENV="$(absolute "$VENV")" BIN="$(absolute "$BIN")" ARTEL_HOME_DIR="$(absolute "$ARTEL_HOME_DIR")"
+[ ! -d "$REPO" ] || REPO="$(absolute "$REPO")"
+cd "$HOME" 2>/dev/null || cd /
 # ---------------------------------------------------------------------------------------------------------------
 step "Arteliq installer — $OS"
 if [ "$REMOVE_ROOT" = 1 ]; then root_remove; exit 0; fi
@@ -317,22 +387,22 @@ fi
 [ "$REINSTALL" = 1 ] && reinstall_prepare
 
 step "Arteliq → $DIR"
-if [ -d "$DIR/.git" ]; then
+if [ "$REINSTALL" != 1 ] && [ -d "$DIR/.git" ]; then
   git -C "$DIR" pull --ff-only --quiet && note "updated to $(git -C "$DIR" rev-parse --short HEAD)"
 else
   mkdir -p "$(dirname "$DIR")"
-  git clone --quiet "$REPO" "$DIR"
-  note "cloned $(git -C "$DIR" rev-parse --short HEAD)"
+  git clone --quiet "$REPO" "$SRC"
+  note "cloned $(git -C "$SRC" rev-parse --short HEAD)"
 fi
 
 step "Python environment → $VENV"
-if [ ! -x "$VENV/bin/python" ]; then
-  if [ "${ARTEL_INSTALL_NODEPS:-}" = 1 ]; then "$PY" -m venv --system-site-packages "$VENV"; else "$PY" -m venv "$VENV"; fi
+if [ ! -x "$VBUILD/bin/python" ]; then
+  if [ "${ARTEL_INSTALL_NODEPS:-}" = 1 ]; then "$PY" -m venv --system-site-packages "$VBUILD"; else "$PY" -m venv "$VBUILD"; fi
 fi
 if [ "${ARTEL_INSTALL_NODEPS:-}" = 1 ]; then  # tests only: no network, dependencies come from the system site-packages
-  if "$VENV/bin/python" -m pip install --quiet --no-deps --no-build-isolation -e "$DIR" >/dev/null 2>&1; then :
+  if "$VBUILD/bin/python" -m pip install --quiet --no-deps --no-build-isolation -e "$SRC" >/dev/null 2>&1; then :
   else  # no setuptools (3.12+ venvs) or no wheel (older setuptools) and no network: link the checkout, write the launcher
-    "$VENV/bin/python" - "$DIR" "$VENV" <<'PYEOF'
+    "$VBUILD/bin/python" - "$SRC" "$VBUILD" <<'PYEOF'
 import os, site, sys
 d, v = sys.argv[1:3]
 sp = [p for p in site.getsitepackages() if p.startswith(v)][0]
@@ -344,9 +414,10 @@ for name in ("arteliq", "artel"):  # artel stays as an alias for existing instal
 PYEOF
   fi
 else
-  "$VENV/bin/python" -m pip install --quiet --upgrade pip
-  "$VENV/bin/python" -m pip install --quiet -e "$DIR[dev]"  # [dev] = pytest: the updater checks a new version before installing it
+  "$VBUILD/bin/python" -m pip install --quiet --upgrade pip
+  "$VBUILD/bin/python" -m pip install --quiet -e "$SRC[dev]"  # [dev] = pytest: the updater checks a new version before installing it
 fi
+[ "$REINSTALL" != 1 ] || reinstall_commit
 root_setup
 mkdir -p "$BIN"
 ln -sf "$VENV/bin/arteliq" "$BIN/arteliq"
@@ -371,14 +442,14 @@ if [ "$SERVICE" = 1 ]; then
 [Unit]
 Description=Arteliq dashboard
 [Service]
-ExecStart=$VENV/bin/artel web
+ExecStart=$VENV/bin/artel web --port $PORT
 Restart=on-failure
 Environment=PATH=$BIN:$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin
 [Install]
 WantedBy=default.target
 UNIT
     systemctl --user daemon-reload && systemctl --user enable --now artel.service && note "systemd --user: artel.service"
-    START=0
+    START=0 SERVICE_STARTED=1
   elif [ "$OS" = Darwin ]; then
     plist="$HOME/Library/LaunchAgents/ai.artel.dashboard.plist"
     mkdir -p "$(dirname "$plist")"
@@ -387,14 +458,14 @@ UNIT
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
   <key>Label</key><string>ai.artel.dashboard</string>
-  <key>ProgramArguments</key><array><string>$VENV/bin/artel</string><string>web</string></array>
+  <key>ProgramArguments</key><array><string>$VENV/bin/artel</string><string>web</string><string>--port</string><string>$PORT</string></array>
   <key>RunAtLoad</key><true/><key>KeepAlive</key><true/>
   <key>EnvironmentVariables</key><dict><key>PATH</key><string>$BIN:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string></dict>
 </dict></plist>
 PLIST
     launchctl unload "$plist" 2>/dev/null || true
     launchctl load "$plist" && note "launchd: ai.artel.dashboard"
-    START=0
+    START=0 SERVICE_STARTED=1
   else
     note "no systemd/launchd here; start it with: arteliq web"
   fi
@@ -403,13 +474,20 @@ fi
 step "Check"
 "$VENV/bin/artel" providers || true
 printf '\n%s▲ Arteliq установлен.%s\n' "$C" "$R"
-note "дашборд:   arteliq web  →  http://127.0.0.1:8765"
+url="http://127.0.0.1:$PORT"
+if [ "$SERVICE_STARTED" = 1 ]; then note "дашборд:   $url  (фоновая служба)"
+elif [ "$START" = 1 ] && port_busy; then
+  START=0
+  note "порт $PORT занят другой программой: панель не запущена, чужой адрес не открываю"
+  note "запуск на другом порту: arteliq web --port $((PORT + 1))"
+elif [ "$START" = 1 ] && [ -t 1 ]; then note "дашборд:   $url"
+else note "запуск: arteliq web"
+fi
 note "Codex / Claude Code: по необходимости — «Провайдеры» → «Установить», затем вход"
 note "обновление: кнопка в дашборде или arteliq update"
 if [ "$START" = 1 ] && [ -t 1 ]; then
-  url="http://127.0.0.1:8765"
   (sleep 2; { have xdg-open && xdg-open "$url"; } || { have open && open "$url"; } || true) >/dev/null 2>&1 &
-  exec "$VENV/bin/artel" web
+  exec "$VENV/bin/artel" web --port "$PORT"
 fi
 }
 

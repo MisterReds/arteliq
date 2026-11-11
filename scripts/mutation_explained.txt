@@ -25,3 +25,4 @@ artel/roadmap_html.py:330: equivalent mutants on moved code: .get("features", []
 artel/roadmap_html.py:339: equivalent mutant on moved code: hs.get("snapshot", "") default, harnesses.yaml always has a snapshot
 artel/agent_env.py:177: equivalent mutant, target = False -> None initial value: target is only read for truthiness (elif target) and is assigned before the other read (not target)
 artel/agent_env.py:184: equivalent mutant, target = False -> None after a redirect target: target is only read for truthiness, None and False behave the same
+artel/web/server.py:1062: timeout, not survival: the mutant (remote flag dropped for _listen_host) makes serve() raise SystemExit inside the thread of the real-server tests in tests/test_remote.py, so they wait for a server that never starts and hit the budget before tests/test_web_serve.py (test_listen_host_defaults_and_refusal, test_serve_remote_issues_a_token_after_the_bind) can fail it

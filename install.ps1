@@ -36,6 +36,10 @@ $ErrorActionPreference = "Stop"
 try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch {}
 $Repo = if ($env:ARTEL_REPO) { $env:ARTEL_REPO } else { "https://github.com/MisterReds/arteliq.git" }
 $Venv = if ($env:ARTEL_VENV) { $env:ARTEL_VENV } else { "$env:USERPROFILE\.artel\venv" }
+# Never depend on the caller's directory (it may be the app being replaced): resolve relative inputs, then leave it.
+$Dir = [System.IO.Path]::GetFullPath($Dir); $Venv = [System.IO.Path]::GetFullPath($Venv)
+if (Test-Path -LiteralPath $Repo -PathType Container) { $Repo = [System.IO.Path]::GetFullPath($Repo) }
+Set-Location -LiteralPath $env:USERPROFILE
 
 function Step($t) { Write-Host "▲ " -ForegroundColor DarkYellow -NoNewline; Write-Host $t }
 function Note($t) { Write-Host "  $t" -ForegroundColor DarkGray }
@@ -133,9 +137,17 @@ function Reinstall-Prepare {
   if ($env:ARTEL_PARENT_PID) { try { Wait-Process -Id ([int]$env:ARTEL_PARENT_PID) -Timeout 60 -ErrorAction SilentlyContinue } catch {} }
   $task = Get-ScheduledTask -TaskName "Arteliq dashboard" -ErrorAction SilentlyContinue
   if ($task) { Stop-ScheduledTask -TaskName "Arteliq dashboard" -ErrorAction SilentlyContinue; $script:Service = $true }
+  # Replace-after-success (app): the new clone is made next to the old one first; a failed clone leaves everything as it was.
+  $script:NewDir = "$Dir.new-$PID"
+  New-Item -ItemType Directory -Force -Path (Split-Path $Dir) | Out-Null
+  if (-not (Git-Run clone --quiet $Repo $script:NewDir).Ok) {
+    if (Test-Path -LiteralPath $script:NewDir) { Remove-Item -LiteralPath $script:NewDir -Recurse -Force -ErrorAction SilentlyContinue }
+    throw "git clone failed; the old installation is untouched"
+  }
   Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.Path -and $_.Path.StartsWith("$Venv\", [StringComparison]::OrdinalIgnoreCase) } | Stop-Process -Force -ErrorAction SilentlyContinue
   Start-Sleep -Milliseconds 500
   if ($appAction -eq "delete") { Remove-Item -LiteralPath $Dir -Recurse -Force } elseif ($appAction -eq "move") { Move-Aside $Dir "app" }
+  Move-Item -LiteralPath $script:NewDir -Destination $Dir
   if ($venvAction -eq "delete") { Remove-Item -LiteralPath $Venv -Recurse -Force } elseif ($venvAction -eq "move") { Move-Aside $Venv "virtual environment" }
 }
 function Check($what) { if ($LASTEXITCODE -ne 0) { throw "$what failed (exit $LASTEXITCODE)" } }
@@ -162,7 +174,9 @@ Note "ok"
 if ($Reinstall) { Reinstall-Prepare }
 
 Step "Arteliq → $Dir"
-if (Test-Path -LiteralPath "$Dir\.git") {
+if ($Reinstall) {
+  Note ("cloned " + (Git-Run -C $Dir rev-parse --short HEAD).Out)
+} elseif (Test-Path -LiteralPath "$Dir\.git") {
   if (-not (Git-Run -C $Dir pull --ff-only --quiet).Ok) { throw "git pull failed" }
   Note ("updated to " + (Git-Run -C $Dir rev-parse --short HEAD).Out)
 } else {
@@ -197,7 +211,7 @@ if ($Service) {
 Step "Check"
 & "$Venv\Scripts\artel.exe" providers
 Write-Host "`n▲ Arteliq установлен." -ForegroundColor DarkYellow
-Note "дашборд:    arteliq web  →  http://127.0.0.1:8765"
+if ($NoStart -and -not $Service) { Note "запуск: arteliq web" } else { Note "дашборд:    http://127.0.0.1:8765" }
 Note "Codex / Claude Code: по необходимости — «Провайдеры» → «Установить», затем вход"
 Note "обновление: кнопка в дашборде или arteliq update"
 if (-not $NoStart) {
