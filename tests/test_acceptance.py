@@ -283,18 +283,12 @@ def test_verify_configured_order_and_no_fallback(scripted, monkeypatch):
         assert runtime_for(live, "auditor") == "codex"
 
 
-def test_scenarios_ship_inside_the_installed_package(tmp_path):
-    """`pip install arteliq` gives no repository checkout: the scenarios must be package data, found next to the code."""
-    import subprocess
-    import sys
-    import zipfile
-
+def test_scenarios_ship_inside_the_installed_package():
+    """`pip install arteliq` gives no repository checkout: the scenarios are package data, found next to the code
+    (the release workflow loads one from the built wheel)."""
     import artel
 
     for name in ("S", "L"):
         assert (Path(artel.__file__).parent / "data" / "acceptance" / f"{name}.yaml").is_file()
-    root = Path(__file__).parents[1]
-    subprocess.run([sys.executable, "-m", "pip", "wheel", "-q", "--no-deps", "--no-build-isolation", "-w", str(tmp_path),
-                    str(root)], check=True, capture_output=True)
-    names = zipfile.ZipFile(next(tmp_path.glob("arteliq-*.whl"))).namelist()
-    assert "artel/data/acceptance/S.yaml" in names and "artel/data/acceptance/L.yaml" in names
+    declared = (Path(__file__).parents[1] / "pyproject.toml").read_text(encoding="utf-8")
+    assert '"acceptance/*.yaml"' in declared.split('"artel.data" = ', 1)[1].split("\n", 1)[0]
