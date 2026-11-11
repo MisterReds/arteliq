@@ -19,10 +19,34 @@ Arteliq (ранее Artel). Команда `artel` оставлена как п�
 
 ## Установка
 
-Установщик ставит только то, что нужно самому Arteliq (git, Python 3.10+, GitHub CLI — если нужен вход в GitHub),
-при необходимости входит в GitHub по device code (репозиторий приватный), клонирует Arteliq в `~/.artel/app` (клон —
-значит, работает автообновление), создаёт окружение, кладёт команду `artel` в PATH и открывает дашборд. Повторный
-запуск обновляет установку на месте.
+Нужен Python 3.10+. Два способа; команда и приложение после обоих одни и те же.
+
+**1. Пакет из PyPI** — самый короткий путь:
+```bash
+pip install arteliq          # или: pipx install arteliq
+arteliq app                  # панель в отдельном окне приложения
+```
+Обновление: `pip install -U arteliq`.
+
+**2. Установщик одной командой** — ставит Arteliq клоном репозитория в `~/.artel/app`, поэтому работает
+автообновление из панели (см. «Обновление»); создаёт окружение, кладёт команды `arteliq` и `artel` в PATH и
+открывает панель. Ставит только то, что нужно самому Arteliq (git, Python 3.10+). Повторный запуск обновляет
+установку на месте.
+
+**После установки**
+
+| Что | Команда |
+|---|---|
+| Открыть приложение (окно без вкладок и адресной строки) | `arteliq app` |
+| Ярлык «Arteliq» в меню приложений (Linux, macOS, Windows) | `arteliq app --install-shortcut` |
+| Панель в браузере | `arteliq web`, затем http://127.0.0.1:8765 (другой порт: `arteliq web --port N`) |
+| Что подключено: подписки, ключи, изоляция | `arteliq providers` |
+| Первая цель | `arteliq run "Сделай CLI-утилиту на Python: CSV → JSON, с тестами и README" --web` |
+| Проверка всей механики без ключа и подписки | `arteliq run "любая цель" --provider scripted` |
+
+Приложение — не отдельная программа: это та же панель в собственном окне, с системными уведомлениями и значком;
+подробности — в разделе «Приложение на компьютере». Чтобы Arteliq работал на подписке, войдите в её CLI один раз:
+Claude Code — `claude`, затем `/login`; Codex — `codex login`. Команда `artel` оставлена как псевдоним `arteliq`.
 
 Codex CLI и Claude Code CLI по умолчанию не ставятся. Когда понадобятся: «Провайдеры» → «Установить» (или
 `arteliq providers install codex|claude`). Ставятся нативные сборки (Codex — из релизов openai/codex, Claude Code —
@@ -31,30 +55,25 @@ Node.js. «Удалить» убирает их оттуда.
 
 **Установка одной командой**
 
-Linux / macOS (репозиторий приватный, `gh` уже вошёл в аккаунт):
-```bash
-gh api repos/MisterReds/arteliq/contents/install.sh -H "Accept: application/vnd.github.raw" | bash
-```
-Windows (PowerShell):
-```powershell
-iex (gh api repos/MisterReds/arteliq/contents/install.ps1 -H "Accept: application/vnd.github.raw" | Out-String)
-```
-Если репозиторий публичный:
+Linux / macOS:
 ```bash
 curl -fsSL https://raw.githubusercontent.com/MisterReds/arteliq/master/install.sh | bash
 ```
+Windows (PowerShell):
 ```powershell
 irm https://raw.githubusercontent.com/MisterReds/arteliq/master/install.ps1 | iex
 ```
 Опции через pipe: `... | bash -s -- --with-codex --service`. В PowerShell через `iex` опции задаются переменными
 окружения: `$env:ARTEL_NOSTART=1; $env:ARTEL_SERVICE=1; $env:ARTEL_WITH_CODEX=1` и т. п. перед командой.
 Опции: `--with-codex`, `--with-claude` (сразу поставить CLI), `--service` (дашборд в фоне: systemd --user /
-launchd; в Windows — запуск при входе), `--no-start`, `--dir ПУТЬ`, `--yes`.
+launchd; в Windows — запуск при входе), `--no-start`, `--dir ПУТЬ`, `--yes`. Порт панели: переменная `ARTEL_PORT`
+(по умолчанию 8765); если порт занят другой программой, установщик и `arteliq web` говорят об этом прямо.
 
 **Переустановка одной командой**: `arteliq reinstall` (или `... | bash -s -- --reinstall`,
 `$env:ARTEL_REINSTALL=1` перед командой для Windows). Удаляются только свежеклонируемая копия `~/.artel/app` и
 окружение `~/.artel/venv` (копия с локальными правками или неотправленными коммитами переезжает в
-`~/.artel/app.bak-<время>`), затем всё ставится заново и фоновая служба перезапускается. Конфиг, проекты, ключи и
+`~/.artel/app.bak-<время>`). Новая копия и новое окружение сначала собираются рядом и проверяются и только потом
+заменяют старые: если что-то не удалось, прежняя установка остаётся рабочей. Фоновая служба перезапускается. Конфиг, проекты, ключи и
 остальное в `~/.artel` не трогаются. `--yes` — без вопроса.
 
 Вручную (без одной команды): скачайте `install.sh` со страницы репозитория (Raw → сохранить) и выполните
@@ -69,11 +88,14 @@ CI (GitHub Actions, `.github/workflows/ci.yml`) на каждый push и pull r
 ## Быстрый старт
 
 ```bash
-pip install -e .
-export ANTHROPIC_API_KEY=...            # или `ant auth login`
+pip install arteliq
 arteliq run "Сделай CLI-утилиту на Python: CSV → JSON, с тестами и README" --web
-# дашборд: http://127.0.0.1:8765
+# панель: http://127.0.0.1:8765  (в окне приложения: arteliq app)
 ```
+
+На чём идёт работа: подписка Claude Code или Codex, если их CLI вошли в аккаунт (`arteliq providers` покажет);
+либо ключ API — `export ANTHROPIC_API_KEY=...` (ключ задаётся только переменной окружения). Из исходников для
+разработки: `git clone https://github.com/MisterReds/arteliq && cd arteliq && pip install -e ".[dev]"`.
 
 Без ключа, детерминированно (проверка всей механики): `arteliq run "любая цель" --provider scripted`.
 
@@ -186,7 +208,8 @@ models: {default: deepseek-chat}
 
 ## Обновление
 
-Arteliq ставится клоном репозитория (`git clone … && pip install -e .`) и обновляется сам: в дашборде кнопка
+Установка из PyPI обновляется командой `pip install -U arteliq`. Установка установщиком — это клон репозитория,
+и она обновляется сама: в дашборде кнопка
 «Обновление (N)» появляется, когда в канале (`origin/master` — туда эволюция вливает только проверенное) есть новые
 изменения. Окно показывает новые пункты дорожной карты и список изменений. «Обновить» сначала прогоняет тесты опор
 на новой версии во временной копии (при провале ничего не меняется), затем перематывает установку вперёд,
