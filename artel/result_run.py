@@ -221,12 +221,22 @@ def proc_identity(pid: int) -> dict | None:
         return None
 
 
+def _port_argv(command: list, port: int) -> list:
+    argv = [a.replace("{port}", str(port)) for a in command]
+    if WIN and argv and argv[0] in ("npm", "npx"):
+        argv[0] += ".cmd"
+    return argv
+
+
 def write_pidfile(path: Path, record: dict) -> None:
     """Replace run.pid atomically: readers (the CLI polling for it, another process) see the old or the new record,
     never an empty or half-written file."""
     tmp = path.with_name(f"{path.name}.{os.getpid()}.tmp")
-    tmp.write_text(json.dumps(record), encoding="utf-8")
-    os.replace(tmp, path)
+    try:
+        tmp.write_text(json.dumps(record), encoding="utf-8")
+        os.replace(tmp, path)
+    except OSError:
+        pass  # best effort: the run works without its pid file (Windows: a reader may hold it open)
 
 
 def pid_record(pid: int, **extra) -> dict:
@@ -403,6 +413,27 @@ class ResultRunner:
         finally:
             lk.release()
 
+    def _start_static(self, project, spec: dict, cwd: Path, port: int) -> dict:
+        server = LocalHTTPServer(("127.0.0.1", port), partial(_QuietHandler, directory=str(cwd)))
+        server.daemon_threads = True
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        live = _Live(server=server, port=port, url=f"http://127.0.0.1:{port}", spec=spec)
+        live.answering = True
+        with self.lock:
+            self.live[project.slug] = live
+        return {"url": live.url, "pid": os.getpid(), "port": port}
+
+    def _announce(self, live: _Live, pidfile: Path, record: dict, found: tuple | None) -> None:
+        """Settle the run's URL (the one it printed, else the port we gave it) and record it in run.pid."""
+        proc, spec = live.proc, live.spec
+        if found:
+            live.url, live.port = found[0], found[1]
+        else:
+            live.url = f"http://127.0.0.1:{live.port}"
+        live.url += spec.get("url_path", "") if spec.get("url_path", "").startswith("/") else ""
+        if proc.poll() is None:
+            write_pidfile(pidfile, {**record, "port": live.port, "url": live.url})
+
     def _start(self, project) -> dict:
         spec = run_spec(project)
         if not spec:
@@ -415,19 +446,9 @@ class ResultRunner:
         port = free_port()
         log = self._logfile(project)
         if spec["kind"] == "static":
-            server = LocalHTTPServer(("127.0.0.1", port), partial(_QuietHandler, directory=str(cwd)))
-            server.daemon_threads = True
-            threading.Thread(target=server.serve_forever, daemon=True).start()
-            live = _Live(server=server, port=port, url=f"http://127.0.0.1:{port}", spec=spec)
-            live.answering = True
-            with self.lock:
-                self.live[project.slug] = live
-            return {"url": live.url, "pid": os.getpid(), "port": port}
+            return self._start_static(project, spec, cwd, port)
         env = agent_env("native", {"PORT": str(port), "HOST": "127.0.0.1"}, self.config)
-        argv = [a.replace("{port}", str(port)) for a in spec["command"]]
-        if WIN and argv and argv[0] in ("npm", "npx"):
-            argv[0] += ".cmd"
-        argv = self._argv(project, argv, cwd)
+        argv = self._argv(project, _port_argv(spec["command"], port), cwd)
         log.parent.mkdir(parents=True, exist_ok=True)
         log.write_bytes(b"")
         proc = subprocess.Popen(argv, cwd=str(cwd), env=env, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
@@ -438,22 +459,9 @@ class ResultRunner:
         with self.lock:
             self.live[project.slug] = live
         record = pid_record(proc.pid, port=port)
-        try:
-            write_pidfile(pidfile, record)
-        except OSError:
-            pass
+        write_pidfile(pidfile, record)
         threading.Thread(target=self._watch, args=(proc, pidfile), daemon=True).start()
-        found = self._wait_url(live)
-        if found:
-            live.url, live.port = found[0], found[1]
-        else:
-            live.url = f"http://127.0.0.1:{port}"
-        live.url += spec.get("url_path", "") if spec.get("url_path", "").startswith("/") else ""
-        if proc.poll() is None:
-            try:
-                write_pidfile(pidfile, {**record, "port": live.port, "url": live.url})
-            except OSError:
-                pass
+        self._announce(live, pidfile, record, self._wait_url(live))
         end = time.monotonic() + READY_WAIT_S
         while time.monotonic() < end and proc.poll() is None:
             if _connects(live.port):

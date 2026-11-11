@@ -326,8 +326,9 @@ class UnreadAtClose(LocalHTTPServer):
     def shutdown_request(self, request):
         import socket
         try:
-            self.unread.append(len(request.recv(1 << 20, socket.MSG_PEEK | socket.MSG_DONTWAIT)))
-        except OSError:
+            request.setblocking(False)
+            self.unread.append(len(request.recv(1 << 20, socket.MSG_PEEK)))
+        except OSError:  # nothing pending (would block) or already reset
             self.unread.append(0)
         super().shutdown_request(request)
 
