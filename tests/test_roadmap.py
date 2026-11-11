@@ -315,7 +315,8 @@ def test_renderers_cope_with_sparse_entries_and_cap_the_closes_list(tmp_path):
     from artel.roadmap_html import render_html
 
     (tmp_path / "roadmap.yaml").write_text(
-        "pillars:\n  - id: P1-x\n    title: Pillar\n    source: {harness: H, repo: a/b}\n    status: done\nwaves:\n  1: First\nitems:\n"
+        "pillars:\n  - id: P1-x\n    title: Pillar\n    source: {harness: H, repo: a/b}\n    status: done\n"
+        "waves:\n  1: First\nitems:\n"
         "  - id: I-bare\n    title: Bare item\n"
         "  - id: I-nine\n    wave: 7\n    title: Nine closes\n    status: partial\n    mode: design\n"
         "    source: {harness: H, repo: a/b}\n"
@@ -330,7 +331,8 @@ def test_renderers_cope_with_sparse_entries_and_cap_the_closes_list(tmp_path):
         "  origin: originator\n  origin_note: why\n  metrics: {}\n  features:\n" + nine + eight, encoding="utf-8")
     page = render_html(tmp_path)
     assert "Волна 7 <" in page and "First" not in page  # an untitled wave falls back to its number
-    assert "Закрывает: Hx — F0; Hx — F1; Hx — F2; Hx — F3; Hx — F4; Hx — F5; Hx — F6; Hx — F7 …<" in page
+    first_eight = "; ".join(f"Hx — F{i}" for i in range(8))
+    assert f"Закрывает: {first_eight} …<" in page
     assert "F8" not in page.split('id="I-nine"')[1].split("</div></div>")[2]
     assert "Hx — G6; Hx — G7</div>" in page  # eight closes: all shown, no ellipsis
     md = Roadmap.of_repo(tmp_path).render_markdown()

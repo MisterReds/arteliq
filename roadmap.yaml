@@ -1245,6 +1245,14 @@ items:
     title: "Secrets never enter model context; secrets redacted from the event log, tool results and notifications"
     source: {harness: Arteliq, repo: MisterReds/arteliq, paths: [docs/SPEC.md]}
     acceptance: ["a planted key is absent from the log, the prompts and Telegram"]
+  - id: P7-proactive-observe
+    wave: 14
+    mode: design
+    status: planned
+    title: "Proactive work in observe mode: rules from the owner, a 'would have done' record with a cost forecast in the Decision Log, a separate hard budget"
+    source: {harness: Arteliq, repo: MisterReds/arteliq, paths: [docs/SPEC.md]}
+    after: [P7-decision-log, P7-controls]
+    acceptance: ["a rule in observe writes the intended action and its forecast and executes nothing; the budget cap stops it"]
 
   # ---- M5: M5 · Долгий горизонт: приложения над оболочкой, L, провайдеры (П8, U2, U7) (docs/PLAN-1.0.md) ----
   - id: P8-apps-over-shell
@@ -1329,8 +1337,9 @@ items:
     wave: 20
     mode: design
     status: planned
-    title: "Proactive work under off/observe/auto rules with its own budget, SPEC §14"
+    title: "Proactive work in auto mode: verified results only, usefulness measured, a rule below the threshold switches itself off (SPEC §14)"
     source: {harness: Arteliq, repo: MisterReds/arteliq, paths: [docs/SPEC.md]}
+    after: [P7-proactive-observe]
     acceptance: ["proactive work stays inside its own budget and mode; off does nothing"]
   - id: X-ui-english
     wave: 20

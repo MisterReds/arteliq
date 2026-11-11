@@ -118,7 +118,7 @@
 | M3-watchdog-resume | Project watchdog for progress and drift; resume after a crash or machine sleep without repeating side effects | Arteliq (`MisterReds/arteliq`) | design | план |
 | M3-arch-zero | Empty archcheck baselines: import cycles and module-level mutable state removed | Arteliq (`MisterReds/arteliq`) | design | план |
 
-## M4 · Управление и внимание владельца (П7) — 0/14 готово
+## M4 · Управление и внимание владельца (П7) — 0/15 готово
 
 | Пункт | Что | Откуда | Режим | Статус |
 |---|---|---|---|---|
@@ -136,6 +136,7 @@
 | P7-knowledge-scopes | Knowledge by scope: project, shared library (read-only for agents), owner skills; promotion on evidence | Arteliq (`MisterReds/arteliq`) | design | план |
 | P7-attention-outbox | Requests to the owner as structured Attention records; outgoing messages through an outbox with receipts | Arteliq (`MisterReds/arteliq`) | design | план |
 | P7-secrets | Secrets never enter model context; secrets redacted from the event log, tool results and notifications | Arteliq (`MisterReds/arteliq`) | design | план |
+| P7-proactive-observe | Proactive work in observe mode: rules from the owner, a 'would have done' record with a cost forecast in the Decision Log, a separate hard budget | Arteliq (`MisterReds/arteliq`) | design | план |
 
 ## M5 · Долгий горизонт: приложения над оболочкой, L, провайдеры (П8, U2, U7) — 0/3 готово
 
@@ -180,7 +181,7 @@
 | X-evolution-unfreeze | Unfreeze evolution: candidates chosen on a working set, confirmed on a held-out set | Arteliq (`MisterReds/arteliq`) | design | план |
 | X-relay-android | Relay server with end-to-end encryption and the Android client, SPEC П8b | Arteliq (`MisterReds/arteliq`) | design | план |
 | X-native-shell | Native desktop shell with tray, only if the installed web app is not enough, SPEC П8a step 2 | Arteliq (`MisterReds/arteliq`) | design | план |
-| X-proactive | Proactive work under off/observe/auto rules with its own budget, SPEC §14 | Arteliq (`MisterReds/arteliq`) | design | план |
+| X-proactive | Proactive work in auto mode: verified results only, usefulness measured, a rule below the threshold switches itself off (SPEC §14) | Arteliq (`MisterReds/arteliq`) | design | план |
 | X-ui-english | English interface next to Russian | Arteliq (`MisterReds/arteliq`) | design | план |
 
 ## Изученные проекты — 7
@@ -197,4 +198,4 @@
 | `Yeachan-Heo/oh-my-claudecode` | MIT | 7 | A-omc-clarify-gate, A-omc-review-tiers, A-omc-secret-redaction | Claude Code plugin: team pipeline plan/prd/exec/verify/fix, deep-interview ambiguity gate, verification tiers, notifications with a reply listener and token red |
 | `chaitanyagiri/munder-difflin` | MIT | 6 | A-munder-work-tokens | Electron desktop app wrapping many terminal agent CLIs as an office: git-backed hive mailbox with a single committer, markdown memory, runaway circuit breaker ( |
 
-Итого: 35/107 пунктов готово.
+Итого: 35/108 пунктов готово.
