@@ -7,6 +7,7 @@ shell commands. Remote mode (`arteliq web --remote`, docs/REMOTE.md) binds beyon
 
 from __future__ import annotations
 
+import errno
 import ipaddress
 import json
 import os
@@ -993,13 +994,39 @@ def serve(port: int = 8765, config: dict | None = None, host: str | None = None,
 
         host = host or web.get("host") or "0.0.0.0"
         auth = Auth(session_days=web.get("session_days", 30))
-        token = auth.ensure_token()
     else:
         host = host or "127.0.0.1"
         if not _loopback(host):
             raise SystemExit(f"arteliq web: {host} is beyond localhost; that needs login - use `arteliq web --remote`"
                              " (see docs/REMOTE.md)")
+
+    class Server(LocalHTTPServer):
+        runner: Runner  # set once the runner exists; the port is bound first
+
+        def handle_error(self, request, client_address):  # an unhandled dashboard error becomes a report too
+            import traceback
+
+            tb = traceback.format_exc()
+            super().handle_error(request, client_address)
+            try:
+                from .. import reports
+
+                reports.record("exception", tb.strip().splitlines()[-1][:200], tb, config=self.runner.config)
+            except Exception:
+                pass
+
+    try:  # bind first: a taken port must stop us before threads start or an access token is issued
+        httpd = Server((host, port), BaseHTTPRequestHandler)
+    except OSError as e:
+        if e.errno not in (errno.EADDRINUSE, 10048):  # 10048 = WSAEADDRINUSE
+            raise
+        raise SystemExit(f"Порт {port} уже занят другой программой, панель не запущена. Запустите на другом порту: "
+                         f"arteliq web --port {port + 1}") from None
+    if remote:
+        token = auth.ensure_token()
     runner = Runner(config)
+    httpd.runner = runner
+    httpd.RequestHandlerClass = make_handler(runner, auth)
     runner.start_update_loop()
     if (config.get("evolve") or {}).get("auto_resume", True):
         from ..evolve.supervisor import Supervisor
@@ -1013,20 +1040,6 @@ def serve(port: int = 8765, config: dict | None = None, host: str | None = None,
         code = (runner.telegram.store.data.get("pair") or {}).get("code")
         if code:
             print(f"Telegram: отправьте боту /pair {code} (код действует 15 минут)", flush=True)
-    class Server(LocalHTTPServer):
-        def handle_error(self, request, client_address):  # an unhandled dashboard error becomes a report too
-            import traceback
-
-            tb = traceback.format_exc()
-            super().handle_error(request, client_address)
-            try:
-                from .. import reports
-
-                reports.record("exception", tb.strip().splitlines()[-1][:200], tb, config=runner.config)
-            except Exception:
-                pass
-
-    httpd = Server((host, port), make_handler(runner, auth))
     httpd.daemon_threads = True
     from ..brand import banner
 

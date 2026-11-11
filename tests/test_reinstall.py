@@ -256,3 +256,60 @@ def test_reinstall_removes_the_root_wrapper_when_the_owner_says_no(box):
     out = run_sh(renv, "--reinstall")
     assert out.returncode == 0, out.stdout + out.stderr
     assert not wrapper.exists() and not sudoers.exists()
+
+
+def _artel(env, *args, **kw):
+    return subprocess.run([str(Path(env["ARTEL_BIN"]) / "artel"), *args], env=env, capture_output=True, text=True, **kw)
+
+
+@posix_only
+def test_reinstall_run_from_inside_the_app_dir_leaves_a_working_install(box):
+    _, ah, env = box
+    assert run_sh(env).returncode == 0
+    out = subprocess.run([BASH, str(ROOT / "install.sh"), "--reinstall", "--yes", "--no-start"], env=env, text=True,
+                         cwd=ah / "app", capture_output=True, stdin=subprocess.DEVNULL, timeout=300)
+    assert out.returncode == 0, out.stdout + out.stderr
+    assert (ah / "app" / ".git").is_dir() and (ah / "venv" / "bin" / "python").exists()
+    assert _artel(env, "--help").returncode == 0
+    assert not list(ah.glob("*.new-*")), "temporary directories must be cleaned up"
+
+
+@posix_only
+def test_failed_clone_leaves_the_old_install_untouched(box):
+    tmp, ah, env = box
+    assert run_sh(env).returncode == 0
+    (ah / "venv" / "STALE").write_text("old", encoding="utf-8")
+    head = g(ah / "app", "rev-parse", "HEAD")
+    broken = tmp / "not-a-repo"
+    broken.mkdir()  # exists, so the access check passes; the clone itself fails
+    out = run_sh({**env, "ARTEL_REPO": str(broken)}, "--reinstall")
+    assert out.returncode != 0, out.stdout + out.stderr
+    assert g(ah / "app", "rev-parse", "HEAD") == head
+    assert (ah / "venv" / "STALE").read_text(encoding="utf-8") == "old"
+    assert _artel(env, "--help").returncode == 0
+    assert not list(ah.glob("*.new-*")) and not baks(ah / "app") and not baks(ah / "venv")
+
+
+@posix_only
+def test_no_start_does_not_claim_a_live_dashboard(box):
+    _, _, env = box
+    out = run_sh(env)
+    assert out.returncode == 0, out.stdout + out.stderr
+    assert "http://127.0.0.1" not in out.stdout
+    assert "запуск: arteliq web" in out.stdout
+
+
+@posix_only
+def test_installer_reports_a_busy_port_and_names_the_remedy(box):
+    import socket
+
+    _, _, env = box
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        s.listen()
+        port = s.getsockname()[1]
+        out = subprocess.run([BASH, str(ROOT / "install.sh"), "--yes"], env={**env, "ARTEL_PORT": str(port)}, text=True,
+                             capture_output=True, stdin=subprocess.DEVNULL, timeout=300)
+    assert out.returncode == 0, out.stdout + out.stderr
+    assert f"порт {port} занят" in out.stdout and "arteliq web --port" in out.stdout
+    assert f"http://127.0.0.1:{port}" not in out.stdout
