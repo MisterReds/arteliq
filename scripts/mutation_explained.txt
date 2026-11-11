@@ -18,3 +18,8 @@ artel/roadmap_html.py:191: equivalent mutants on code moved unchanged out of ren
 artel/roadmap_html.py:211: equivalent mutants on code moved unchanged out of render_html/render_markdown: empty-list default of h.get("features"): every rated harness has features
 artel/roadmap_html.py:219: equivalent mutants on code moved unchanged out of render_html/render_markdown: `or 1` guard against division by zero for an empty counter, unreachable with real data
 artel/roadmap_html.py:269: equivalent mutants on code moved unchanged out of render_html/render_markdown: empty-list default of h.get("features"): every rated harness has features
+artel/roadmap_html.py:276: equivalent mutants on code moved unchanged out of render_html: .get defaults for "studied" and "class", present on every harness entry
+artel/roadmap_html.py:278: equivalent mutants on moved code: .get default for "origin_note", which the consistency test requires on every entry
+artel/roadmap_html.py:279: equivalent mutant on moved code: `.get("stars") or 0` default, every metrics block has stars
+artel/roadmap_html.py:330: equivalent mutants on moved code: .get("features", []) default and the defaultdict factory
+artel/roadmap_html.py:339: equivalent mutant on moved code: hs.get("snapshot", "") default, harnesses.yaml always has a snapshot
