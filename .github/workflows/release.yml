@@ -1,4 +1,5 @@
-# Publish to PyPI on a version tag (v*), with PyPI Trusted Publishing (OIDC): no API token is stored anywhere.
+# Publish to PyPI on a version tag (v*) or a push to a branch release/v*, with PyPI Trusted Publishing (OIDC): no
+# API token is stored anywhere. The branch form exists for sessions that may push branches but not tags.
 # One-time setup on pypi.org: Publishing -> Add a pending publisher -> project "arteliq", owner "MisterReds",
 # repository "arteliq", workflow "release.yml", environment "pypi".
 name: Release
@@ -6,6 +7,7 @@ name: Release
 on:
   push:
     tags: ["v*"]
+    branches: ["release/v*"]
 
 permissions:
   contents: read
@@ -21,7 +23,7 @@ jobs:
       - name: Tag matches the package version
         run: |
           v=$(python3 -c "import re;print(re.search(r'^version = \"([^\"]+)\"', open('pyproject.toml').read(), re.M).group(1))")
-          test "v$v" = "$GITHUB_REF_NAME" || { echo "tag $GITHUB_REF_NAME != version $v"; exit 1; }
+          test "v$v" = "${GITHUB_REF_NAME#release/}" || { echo "ref $GITHUB_REF_NAME != version $v"; exit 1; }
       - name: Build
         run: python3 -m pip install build twine && python3 -m build && python3 -m twine check dist/*
       - name: Smoke test the wheel in a clean venv
