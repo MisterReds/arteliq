@@ -16,7 +16,7 @@ from pathlib import Path
 import yaml
 
 OPEN = ("planned", "partial", "in_progress")
-ABSORB_WAVE = 4                       # items found by studying other harnesses queue after the hand-planned waves
+ABSORB_WAVE = 20                      # items found by studying other harnesses queue after the hand-planned waves
 STUDY_CATEGORIES = ("harness", "orchestrator", "memory-skills", "framework", "sandbox", "eval", "protocol")
 STATUS_MARK = {"done": "готово", "partial": "частично", "in_progress": "в работе", "planned": "план",
                "blocked": "нужна помощь"}
@@ -28,6 +28,11 @@ class Roadmap:
         self.data = yaml.safe_load(self.path.read_text(encoding="utf-8")) or {}
         self.pillars: list[dict] = self.data.get("pillars", [])
         self.items: list[dict] = self.data.get("items", [])
+        self.wave_titles: dict[int, str] = {int(k): str(v) for k, v in (self.data.get("waves") or {}).items()}
+
+    def wave_heading(self, w: int) -> str | None:
+        """The title given in roadmap.yaml `waves:`, if any (the renderers fall back to "Волна N")."""
+        return self.wave_titles.get(w)
 
     @classmethod
     def of_repo(cls, repo: Path) -> Roadmap:
@@ -150,6 +155,29 @@ class Roadmap:
                        f"{', '.join(r.get('added', [])) or '—'} | {str(r.get('summary', ''))[:160]} |")
         return out
 
+    @staticmethod
+    def _pillar_row(p: dict) -> str:
+        s = p.get("source") or {}
+        return f"| {p['id']} | {p['title']} | {s.get('harness', '')} | {STATUS_MARK.get(p.get('status'), p.get('status'))} |"
+
+    @staticmethod
+    def _item_row(it: dict) -> str:
+        s = it.get("source") or {}
+        st = STATUS_MARK.get(it.get("status"), it.get("status"))
+        if it.get("result"):
+            st += f" — {it['result']}"
+        return (f"| {it['id']} | {it['title']} | {s.get('harness', '')} (`{s.get('repo', '')}`) | "
+                f"{it.get('mode')} | {st} |")
+
+    def _wave_markdown(self, w: int) -> list[str]:
+        items = [it for it in self.items if it.get("wave", 0) == w]
+        done = sum(1 for it in items if it.get("status") == "done")
+        label = " (найдено разбором проектов)" if w == ABSORB_WAVE else ""
+        heading = self.wave_heading(w) or f"Волна {w}"
+        return ["", f"## {heading}{label} — {done}/{len(items)} готово", "",
+                "| Пункт | Что | Откуда | Режим | Статус |", "|---|---|---|---|---|",
+                *(self._item_row(it) for it in items)]
+
     def render_markdown(self) -> str:
         out = ["# Дорожная карта Arteliq", "",
                "Сгенерировано из `roadmap.yaml` командой `arteliq roadmap render`. Правки — только в yaml. "
@@ -157,23 +185,9 @@ class Roadmap:
                "Режимы: **pillar** — опора, контракт закреплён `tests/test_invariants.py`; **design** — структурное "
                "изменение, делается вручную; **evolve** — реализует сам Arteliq (`arteliq evolve --roadmap`).", "",
                "## Опоры", "", "| Опора | Что | Источник | Статус |", "|---|---|---|---|"]
-        for p in self.pillars:
-            s = p.get("source") or {}
-            out.append(f"| {p['id']} | {p['title']} | {s.get('harness', '')} | {STATUS_MARK.get(p.get('status'), p.get('status'))} |")
-        waves = sorted({it.get("wave", 0) for it in self.items})
-        for w in waves:
-            items = [it for it in self.items if it.get("wave", 0) == w]
-            done = sum(1 for it in items if it.get("status") == "done")
-            label = " (найдено разбором проектов)" if w == ABSORB_WAVE else ""
-            out += ["", f"## Волна {w}{label} — {done}/{len(items)} готово", "",
-                    "| Пункт | Что | Откуда | Режим | Статус |", "|---|---|---|---|---|"]
-            for it in items:
-                s = it.get("source") or {}
-                st = STATUS_MARK.get(it.get("status"), it.get("status"))
-                if it.get("result"):
-                    st += f" — {it['result']}"
-                out.append(f"| {it['id']} | {it['title']} | {s.get('harness', '')} (`{s.get('repo', '')}`) | "
-                           f"{it.get('mode')} | {st} |")
+        out += [self._pillar_row(p) for p in self.pillars]
+        for w in sorted({it.get("wave", 0) for it in self.items}):
+            out += self._wave_markdown(w)
         total = len(self.items)
         done = sum(1 for it in self.items if it.get("status") == "done")
         out += self.studied_markdown()

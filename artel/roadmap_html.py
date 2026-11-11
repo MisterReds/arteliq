@@ -7,7 +7,7 @@ import html
 from collections import Counter, defaultdict
 from pathlib import Path
 
-from .roadmap import SIGNIFICANCE, STATUS_MARK, STUDY, TIERS, Roadmap, load_harnesses, significance
+from .roadmap import ABSORB_WAVE, SIGNIFICANCE, STATUS_MARK, STUDY, TIERS, Roadmap, load_harnesses, significance
 
 E = html.escape
 FEATURE = {"done": ("есть", "ok"), "partial": ("частично", "warn"), "planned": ("в плане", "run"), "gap": ("пробел", "bad"), "skip": ("не берём", "todo")}
@@ -102,34 +102,101 @@ def _coverage(features: list) -> tuple[Counter, str]:
     return c, f'<div class="cov">{bars}</div>'
 
 
-def render_html(repo: Path, today: str | None = None) -> str:
-    rm = Roadmap.of_repo(repo)
-    hs = load_harnesses(repo)
-    snap = hs.get("snapshot", "")
-    today = today or snap or None
-    rows = []
-    for h in hs.get("harnesses", []):
-        rows.append((significance(h, today), h))
-    rows.sort(key=lambda r: -r[0]["total"])
-    items = {it["id"]: it for it in rm.pillars + rm.items}
-    closes: dict[str, list] = defaultdict(list)  # roadmap id -> [(harness, mechanism, status)]
-    for s, h in rows:
-        for f in h.get("features", []):
-            if f.get("ref"):
-                closes[f["ref"]].append((h["name"], f["name"], s["tier"]))
 
-    # --- numbers ------------------------------------------------------------------------------------------------
-    tier_of = {h["repo"]: s["tier"] for s, h in rows}
-    core_feats = [f for s, h in rows if s["tier"] == "core" for f in h.get("features", [])]
-    major_feats = [f for s, h in rows if s["tier"] == "major" for f in h.get("features", [])]
-    cc, _ = _coverage(core_feats)
-    mc, _ = _coverage(major_feats)
-    done_items = sum(1 for it in rm.items if it.get("status") == "done")
-    core_open = [it for it in rm.items if it.get("priority") == "core" and it.get("status") != "done"]
-    n_core = sum(1 for s, _ in rows if s["tier"] == "core")
-    n_major = sum(1 for s, _ in rows if s["tier"] == "major")
+PLAN_HEAD = ('<h2 id="plan">План: откуда взято и что будет внедрено</h2>'
+               '<p class="sub">Порядок исполнения: сначала пункты с приоритетом «ядро» (механизмы главных харнессов, '
+               'которых в Arteliq нет), затем по волнам. Режим <b>evolve</b> реализует сам Arteliq (ветка, тесты, '
+               'бенчмарк, слияние), <b>design</b> — делается вручную.</p>'
+               '<div class="filters"><button data-f="all" aria-pressed="true">Все</button>'
+               '<button data-f="core" aria-pressed="false">Приоритет «ядро»</button>'
+               '<button data-f="open" aria-pressed="false">Впереди</button>'
+               '<button data-f="done" aria-pressed="false">Готово</button></div>')
 
-    out = ['<!doctype html><html lang="ru"><head><meta charset="utf-8">'
+
+def _core(it: dict) -> bool:
+    return it.get("priority") == "core"
+
+
+def _pillar_html(p: dict) -> str:
+    src = p.get("source") or {}
+    paths = f' · <code>{E(", ".join(src.get("paths") or []))}</code>' if src.get("paths") else ""
+    return (f'<div class="item" id="{E(p["id"])}" data-tags="done pillar"><div class="top"><span class="id">{E(p["id"])}</span>'
+            f'<b>{E(p["title"])}</b><span class="chip ok">{E(STATUS_MARK.get(p.get("status"), p.get("status")))}</span></div>'
+            f'<div class="closes">Откуда: {E(src.get("harness", ""))} · {_repo_link(src.get("repo", ""))}{paths}</div></div>')
+
+
+def _closes_html(cl: list) -> str:
+    if not cl:
+        return ""
+    names = "; ".join(f"{E(hn)} — {E(fn)}" for hn, fn, _ in cl[:8])
+    return f'<div class="closes">Закрывает: {names}{" …" if len(cl) > 8 else ""}</div>'
+
+
+def _item_origin(src: dict) -> str:
+    paths = f'<br><code>{E(", ".join(src.get("paths") or []))}</code>' if src.get("paths") else ""
+    lic = f' · лицензия {E(str(src["license"]))}' if src.get("license") else ""
+    return (f'<div><h4>Откуда</h4><p>{E(src.get("harness", ""))} · {_repo_link(src.get("repo", ""))}{lic}{paths}</p></div>')
+
+
+def _item_what(it: dict) -> str:
+    acc = it.get("acceptance") or []
+    plan = E(str(it.get("plan") or it.get("title"))).strip()
+    result = f'<p style="margin-top:6px"><b>Итог:</b> {E(str(it["result"]))}</p>' if it.get("result") else ""
+    target = (f'<p class="sub" style="margin-top:6px">Где в Arteliq: '
+              f'<code>{E(", ".join(it.get("target") or []))}</code></p>') if it.get("target") else ""
+    done_when = (f'<p class="sub" style="margin-top:4px">Готово, когда: {E("; ".join(map(str, acc)))}</p>' if acc else "")
+    return f'<div><h4>Что будет внедрено</h4><p>{plan}</p>{done_when}{target}{result}</div>'
+
+
+def _item_html(it: dict, closes: dict) -> str:
+    st = it.get("status", "planned")
+    tags = [st, "open" if st != "done" else "done"] + (["core"] if _core(it) else [])
+    core = ' <span class="chip t-core">ядро</span>' if _core(it) else ""
+    return (f'<div class="item{" core" if _core(it) else ""}" id="{E(it["id"])}" data-tags="{" ".join(tags)}">'
+            f'<div class="top"><span class="id">{E(it["id"])}</span><b>{E(it["title"])}</b>{core}'
+            f'<span class="chip {ITEM.get(st, "todo")}">{E(STATUS_MARK.get(st, st))}</span>'
+            f'<span class="sub">{E(it.get("mode", ""))}</span></div><div class="grid2">'
+            f'{_item_origin(it.get("source") or {})}{_item_what(it)}</div>{_closes_html(closes.get(it["id"], []))}</div>')
+
+
+WAVE_DEFAULT = {0: "Сделано вручную (продукт и надёжность)", 1: "Волна 1 — надёжность цикла",
+                2: "Волна 2 — изоляция и безопасность", 3: "Волна 3 — ядро и долгие задачи"}
+
+
+def _wave_title(rm: Roadmap, w: int) -> str:
+    return (rm.wave_heading(w) or WAVE_DEFAULT.get(w, f"Волна {w}")) + (" (найдено разбором проектов)" if w == ABSORB_WAVE else "")
+
+
+def _wave_html(rm: Roadmap, w: int, group: list, closes: dict) -> list[str]:
+    done = sum(1 for it in group if it.get("status") == "done")
+    head = (f'<div class="wave"><h3 style="margin:22px 0 6px">{E(_wave_title(rm, w))} '
+            f'<span class="sub">— {done}/{len(group)} готово</span></h3>')
+    return [head, *(_item_html(it, closes) for it in group), "</div>"]
+
+
+def _plan_html(rm: Roadmap, closes: dict) -> list[str]:
+    out = [PLAN_HEAD,
+           '<div class="wave"><h3 style="margin:18px 0 6px">Опоры</h3>', *(_pillar_html(p) for p in rm.pillars), "</div>"]
+    ordered = sorted(rm.items, key=lambda it: (it.get("wave", 0), not _core(it)))
+    for w in sorted({it.get("wave", 0) for it in rm.items}):
+        out += _wave_html(rm, w, [it for it in ordered if it.get("wave", 0) == w], closes)
+    return out
+
+
+def _features_html(h: dict) -> str:
+    feats = []
+    for f in h["features"]:
+        lbl, cls = FEATURE[f["artel"]]
+        ref = f' · <a href="#{E(f["ref"])}">{E(f["ref"])}</a>' if f.get("ref") else ""
+        feats.append(f'<div><b>{E(f["name"])}</b> <span class="sub">— {E(f.get("what", ""))}</span></div>'
+                     f'<div><span class="chip {cls}">{lbl}</span><span class="sub">{ref}</span></div>')
+        if f.get("note"):
+            feats.append(f'<div class="note">{E(f["note"])}</div>')
+    return "".join(feats)
+
+
+def _header_html(snap: str) -> list[str]:
+    return ['<!doctype html><html lang="ru"><head><meta charset="utf-8">'
            '<meta name="viewport" content="width=device-width,initial-scale=1"><title>Дорожная карта Arteliq</title>'
            '<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="stylesheet" '
            'href="https://fonts.googleapis.com/css2?family=Onest:wght@400;600&family=Unbounded:wght@600'
@@ -139,26 +206,46 @@ def render_html(repo: Path, today: str | None = None) -> str:
            '<nav><a href="#summary">Итог</a><a href="#criteria">Критерии</a><a href="#rating">Рейтинг</a>'
            '<a href="#coverage">Что взято</a><a href="#plan">План</a></nav></div></header><main class="wrap">']
 
-    def pct(c: Counter, *keys) -> int:
-        t = sum(c.values()) or 1
-        return round(100 * sum(c[k] for k in keys) / t)
 
-    out.append('<div class="kpis">'
+def _tier_features(rows: list, tier: str) -> list:
+    return [f for s, h in rows if s["tier"] == tier for f in h.get("features", [])]
+
+
+def _count_tier(rows: list, tier: str) -> int:
+    return sum(1 for s, _ in rows if s["tier"] == tier)
+
+
+def _pct(c: Counter, *keys) -> int:
+    t = sum(c.values()) or 1
+    return round(100 * sum(c[k] for k in keys) / t)
+
+
+def _kpis_html(rm: Roadmap, rows: list) -> list[str]:
+    cc, _ = _coverage(_tier_features(rows, "core"))
+    done_items = sum(1 for it in rm.items if it.get("status") == "done")
+    core_open = [it for it in rm.items if _core(it) and it.get("status") != "done"]
+    n_core, n_major = _count_tier(rows, "core"), _count_tier(rows, "major")
+    return ['<div class="kpis">'
                f'<div class="kpi"><b>{len(rows)}</b><span>харнессов оценено ({n_core} в ядре, {n_major} значимых)</span></div>'
-               f'<div class="kpi"><b>{pct(cc, "done")}%</b><span>механизмов ядра уже есть в Arteliq '
+               f'<div class="kpi"><b>{_pct(cc, "done")}%</b><span>механизмов ядра уже есть в Arteliq '
                f'({cc["done"]} из {sum(cc.values())})</span></div>'
-               f'<div class="kpi"><b>{pct(cc, "done", "partial")}%</b><span>есть хотя бы частично</span></div>'
+               f'<div class="kpi"><b>{_pct(cc, "done", "partial")}%</b><span>есть хотя бы частично</span></div>'
                f'<div class="kpi"><b>{cc["gap"] + cc["planned"]}</b><span>механизмов ядра в плане или пробелы</span></div>'
                f'<div class="kpi"><b>{done_items}/{len(rm.items)}</b><span>пунктов дорожной карты готово</span></div>'
-               f'<div class="kpi"><b>{len(core_open)}</b><span>приоритетных пунктов «ядро» впереди</span></div></div>')
+               f'<div class="kpi"><b>{len(core_open)}</b><span>приоритетных пунктов «ядро» впереди</span></div></div>']
 
-    # --- summary ------------------------------------------------------------------------------------------------
+
+def _summary_html(hs: dict) -> list[str]:
+    out: list[str] = []
     findings = hs.get("findings") or []
     out.append('<h2 id="summary">Итог переработки</h2><div class="panel lead">')
     out += [f"<p>{f}</p>" for f in findings]
     out.append("</div>")
+    return out
 
-    # --- criteria -----------------------------------------------------------------------------------------------
+
+def _criteria_html() -> list[str]:
+    out: list[str] = []
     out.append('<h2 id="criteria">По какому критерию харнесс считается значимым</h2><div class="panel lead">'
                "<p>Индекс значимости 0–100 — сумма пяти частей. Четыре измеряются по данным (GitHub через "
                "repos.ecosyste.ms и 10 кураторских списков), одна — экспертная, с письменным обоснованием у каждого "
@@ -173,33 +260,42 @@ def render_html(repo: Path, today: str | None = None) -> str:
                + ". Почему не просто звёзды: у клонов и сборников звёзд бывает больше, чем у первоисточников "
                "(claw-code — 195 тыс., ECC — 272 тыс.), а научные первоисточники самоулучшения (Darwin Gödel Machine) "
                "почти без звёзд. Поэтому в каждом классе указан его лидер.</p>")
+    return out
 
-    # --- rating -------------------------------------------------------------------------------------------------
+
+def _rating_row(i: int, s: dict, h: dict, leaders: dict) -> str:
+    bar = "".join(f'<i style="width:{v}%;background:{PART_COLORS[k]}" title="{E(dict((a, b) for a, _, b, _ in SIGNIFICANCE)[k])}: {v}"></i>'
+                  for k, v in s["parts"].items())
+    c, cov = _coverage(h.get("features", []))
+    covtxt = (f'{cov}<div class="sub">{c["done"]} есть · {c["partial"]} частично · {c["planned"]} в плане · '
+              f'{c["gap"]} пробел' + (f' · {c["skip"]} не берём' if c["skip"] else "") + '</div>') if h.get("features") else '<span class="sub">нечего брать</span>'
+    lead = ' <span class="chip t-core" title="самый значимый в своём классе">лидер класса</span>' \
+        if leaders.get(h["class"]) == h["repo"] else ""
+    m = h["metrics"]
+    return (f'<tr><td class="n">{i}</td><td><b>{E(h["name"])}</b>{lead}<br><span class="sub">{_repo_link(h["repo"])}'
+               f' · {E(CLASSES.get(h["class"], h["class"]))} · {E(STUDY.get(h.get("studied", "none"), ""))}</span></td>'
+               f'<td class="n"><b>{s["total"]:.0f}</b><br><span class="chip t-{s["tier"]}">{E(s["tier_label"].split(" — ")[0])}</span></td>'
+               f'<td title="{E(h.get("origin_note", ""))}"><div class="bar">{bar}</div><div class="sub">{s["parts"]["origin"]:.0f} за первоисточник</div></td>'
+               f'<td class="n">{(m.get("stars") or 0) / 1000:.0f}k</td><td class="sub">{E(OPEN[s["openness"]])}</td>'
+               f'<td style="min-width:170px">{covtxt}</td></tr>')
+
+
+def _rating_html(rows: list) -> list[str]:
+    out: list[str] = []
     out.append('<h2 id="rating">Рейтинг харнессов</h2><div class="legend">'
                + "".join(f'<span style="--sw:{PART_COLORS[k]}">{E(lbl)}</span>' for k, _, lbl, _ in SIGNIFICANCE)
                + '</div><div class="tbl"><table><tr><th>#</th><th>Харнесс</th><th class="n">Индекс</th>'
                  '<th>Из чего</th><th class="n">★</th><th>Код</th><th>Взято в Arteliq</th></tr>')
-    leaders = {}
+    leaders: dict = {}
     for s, h in rows:
         leaders.setdefault(h["class"], h["repo"])
-    for i, (s, h) in enumerate(rows, 1):
-        bar = "".join(f'<i style="width:{v}%;background:{PART_COLORS[k]}" title="{E(dict((a, b) for a, _, b, _ in SIGNIFICANCE)[k])}: {v}"></i>'
-                      for k, v in s["parts"].items())
-        c, cov = _coverage(h.get("features", []))
-        covtxt = (f'{cov}<div class="sub">{c["done"]} есть · {c["partial"]} частично · {c["planned"]} в плане · '
-                  f'{c["gap"]} пробел' + (f' · {c["skip"]} не берём' if c["skip"] else "") + '</div>') if h.get("features") else '<span class="sub">нечего брать</span>'
-        lead = ' <span class="chip t-core" title="самый значимый в своём классе">лидер класса</span>' \
-            if leaders.get(h["class"]) == h["repo"] else ""
-        m = h["metrics"]
-        out.append(f'<tr><td class="n">{i}</td><td><b>{E(h["name"])}</b>{lead}<br><span class="sub">{_repo_link(h["repo"])}'
-                   f' · {E(CLASSES.get(h["class"], h["class"]))} · {E(STUDY.get(h.get("studied", "none"), ""))}</span></td>'
-                   f'<td class="n"><b>{s["total"]:.0f}</b><br><span class="chip t-{s["tier"]}">{E(s["tier_label"].split(" — ")[0])}</span></td>'
-                   f'<td title="{E(h.get("origin_note", ""))}"><div class="bar">{bar}</div><div class="sub">{s["parts"]["origin"]:.0f} за первоисточник</div></td>'
-                   f'<td class="n">{(m.get("stars") or 0) / 1000:.0f}k</td><td class="sub">{E(OPEN[s["openness"]])}</td>'
-                   f'<td style="min-width:170px">{covtxt}</td></tr>')
+    out += [_rating_row(i, s, h, leaders) for i, (s, h) in enumerate(rows, 1)]
     out.append("</table></div>")
+    return out
 
-    # --- coverage cards -----------------------------------------------------------------------------------------
+
+def _cards_html(rows: list) -> list[str]:
+    out: list[str] = []
     out.append('<h2 id="coverage">Что взято из главных харнессов</h2><p class="sub">Ядро и значимые харнессы: их '
                'основные механизмы и есть ли они в Arteliq. Ссылка ведёт на пункт плана, который механизм закрывает.'
                '</p>'
@@ -208,72 +304,40 @@ def render_html(repo: Path, today: str | None = None) -> str:
         if s["tier"] == "niche" or not h.get("features"):
             continue
         c, cov = _coverage(h["features"])
-        feats = []
-        for f in h["features"]:
-            lbl, cls = FEATURE[f["artel"]]
-            ref = f' · <a href="#{E(f["ref"])}">{E(f["ref"])}</a>' if f.get("ref") else ""
-            feats.append(f'<div><b>{E(f["name"])}</b> <span class="sub">— {E(f.get("what", ""))}</span></div>'
-                         f'<div><span class="chip {cls}">{lbl}</span><span class="sub">{ref}</span></div>')
-            if f.get("note"):
-                feats.append(f'<div class="note">{E(f["note"])}</div>')
+        feats = _features_html(h)
         out.append(f'<div class="card"><div class="top"><h3>{E(h["name"])}</h3><span class="chip t-{s["tier"]}">'
                    f'{s["total"]:.0f}</span><span class="sub">{E(CLASSES.get(h["class"], h["class"]))}</span></div>'
                    f'<div class="why">{E(h.get("origin_note", ""))}</div>{cov}<div style="height:10px"></div>'
-                   f'<div class="feat">{"".join(feats)}</div></div>')
+                   f'<div class="feat">{feats}</div></div>')
     out.append("</div>")
+    return out
 
-    # --- plan ---------------------------------------------------------------------------------------------------
-    out.append('<h2 id="plan">План: откуда взято и что будет внедрено</h2>'
-               '<p class="sub">Порядок исполнения: сначала пункты с приоритетом «ядро» (механизмы главных харнессов, '
-               'которых в Arteliq нет), затем по волнам. Режим <b>evolve</b> реализует сам Arteliq (ветка, тесты, '
-               'бенчмарк, слияние), <b>design</b> — делается вручную.</p>'
-               '<div class="filters"><button data-f="all" aria-pressed="true">Все</button>'
-               '<button data-f="core" aria-pressed="false">Приоритет «ядро»</button>'
-               '<button data-f="open" aria-pressed="false">Впереди</button>'
-               '<button data-f="done" aria-pressed="false">Готово</button></div>')
-    out.append('<div class="wave"><h3 style="margin:18px 0 6px">Опоры</h3>')
-    for p in rm.pillars:
-        src = p.get("source") or {}
-        out.append(f'<div class="item" id="{E(p["id"])}" data-tags="done pillar"><div class="top"><span class="id">{E(p["id"])}</span>'
-                   f'<b>{E(p["title"])}</b><span class="chip ok">{E(STATUS_MARK.get(p.get("status"), p.get("status")))}</span></div>'
-                   f'<div class="closes">Откуда: {E(src.get("harness", ""))} · {_repo_link(src.get("repo", ""))}'
-                   + (f' · <code>{E(", ".join(src.get("paths") or []))}</code>' if src.get("paths") else "") + "</div></div>")
-    out.append("</div>")
-    waves = sorted({it.get("wave", 0) for it in rm.items})
-    ordered = sorted(rm.items, key=lambda it: (it.get("wave", 0), it.get("priority") != "core"))
-    for w in waves:
-        group = [it for it in ordered if it.get("wave", 0) == w]
-        done = sum(1 for it in group if it.get("status") == "done")
-        title = {0: "Сделано вручную (продукт и надёжность)", 1: "Волна 1 — надёжность цикла",
-                 2: "Волна 2 — изоляция и безопасность", 3: "Волна 3 — ядро и долгие задачи",
-                 4: "Волна 4 — найдено разбором проектов"}.get(w, f"Волна {w}")
-        out.append(f'<div class="wave"><h3 style="margin:22px 0 6px">{E(title)} <span class="sub">— {done}/{len(group)} готово</span></h3>')
-        for it in group:
-            st = it.get("status", "planned")
-            src = it.get("source") or {}
-            tags = [st, "open" if st != "done" else "done"] + (["core"] if it.get("priority") == "core" else [])
-            core = ' <span class="chip t-core">ядро</span>' if it.get("priority") == "core" else ""
-            paths = f'<br><code>{E(", ".join(src.get("paths") or []))}</code>' if src.get("paths") else ""
-            lic = f' · лицензия {E(str(src["license"]))}' if src.get("license") else ""
-            acc = it.get("acceptance") or []
-            plan = E(str(it.get("plan") or it.get("title"))).strip()
-            result = f'<p style="margin-top:6px"><b>Итог:</b> {E(str(it["result"]))}</p>' if it.get("result") else ""
-            target = (f'<p class="sub" style="margin-top:6px">Где в Arteliq: '
-                      f'<code>{E(", ".join(it.get("target") or []))}</code></p>') if it.get("target") else ""
-            cl = closes.get(it["id"], [])
-            closes_txt = ('<div class="closes">Закрывает: ' + "; ".join(
-                f'{E(hn)} — {E(fn)}' for hn, fn, _ in cl[:8]) + (" …" if len(cl) > 8 else "") + "</div>") if cl else ""
-            out.append(
-                f'<div class="item{" core" if it.get("priority") == "core" else ""}" id="{E(it["id"])}" data-tags="{" ".join(tags)}">'
-                f'<div class="top"><span class="id">{E(it["id"])}</span><b>{E(it["title"])}</b>{core}'
-                f'<span class="chip {ITEM.get(st, "todo")}">{E(STATUS_MARK.get(st, st))}</span>'
-                f'<span class="sub">{E(it.get("mode", ""))}</span></div><div class="grid2">'
-                f'<div><h4>Откуда</h4><p>{E(src.get("harness", ""))} · {_repo_link(src.get("repo", ""))}{lic}{paths}</p></div>'
-                f'<div><h4>Что будет внедрено</h4><p>{plan}</p>'
-                + (f'<p class="sub" style="margin-top:4px">Готово, когда: {E("; ".join(map(str, acc)))}</p>' if acc else "")
-                + f"{target}{result}</div></div>{closes_txt}</div>")
-        out.append("</div>")
-    out.append(f'</main><footer class="wrap">Arteliq · страница генерируется командой '
+
+def _footer_html(snap: str) -> list[str]:
+    return [f'</main><footer class="wrap">Arteliq · страница генерируется командой '
                f'<code>arteliq roadmap html</code> из <code>roadmap.yaml</code> и <code>harnesses.yaml</code>; метрики харнессов — снимок {E(snap)}.</footer>'
-               f"<script>{JS}</script></body></html>")
+               f"<script>{JS}</script></body></html>"]
+
+
+def _rated(hs: dict, today: str | None) -> list:
+    rows = [(significance(h, today), h) for h in hs.get("harnesses", [])]
+    return sorted(rows, key=lambda r: -r[0]["total"])
+
+
+def _closes_map(rows: list) -> dict:
+    closes: dict[str, list] = defaultdict(list)  # roadmap id -> [(harness, mechanism, status)]
+    for s, h in rows:
+        for f in h.get("features", []):
+            if f.get("ref"):
+                closes[f["ref"]].append((h["name"], f["name"], s["tier"]))
+    return closes
+
+
+def render_html(repo: Path, today: str | None = None) -> str:
+    rm = Roadmap.of_repo(repo)
+    hs = load_harnesses(repo)
+    snap = hs.get("snapshot", "")
+    rows = _rated(hs, today or snap or None)
+    out = [*_header_html(snap), *_kpis_html(rm, rows), *_summary_html(hs), *_criteria_html(), *_rating_html(rows),
+           *_cards_html(rows), *_plan_html(rm, _closes_map(rows)), *_footer_html(snap)]
     return "\n".join(out)

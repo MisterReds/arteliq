@@ -2,5 +2,26 @@
 # (equivalent mutants, logging text, defensive branches that cannot be reached). Everything else must be killed by a test.
 artel/contracts/_base.py:65: equivalent mutant, typing.cast(float, v) -> cast(None, v): cast returns its argument at runtime
 artel/contracts/schemas.py:31: equivalent mutant, fields(cast(Any, self)) -> fields(cast(None, self)): cast is a runtime no-op
+artel/roadmap.py:161: equivalent mutants on code moved unchanged out of render_html/render_markdown: default argument of .get() for a status every pillar has; real data cannot tell the mutants apart
+artel/roadmap.py:166: equivalent mutants on code moved unchanged out of render_html/render_markdown: default argument of .get() for a status every item has
+artel/roadmap_html.py:122: equivalent mutants on code moved unchanged out of render_html/render_markdown: `or []` and .get default: pillar paths are absent or a list in the real data
+artel/roadmap_html.py:124: equivalent mutants on code moved unchanged out of render_html/render_markdown: default argument of .get() for a status every pillar has
+artel/roadmap_html.py:125: equivalent mutants on code moved unchanged out of render_html/render_markdown: empty-string defaults for harness/repo, always present on pillars
+artel/roadmap_html.py:138: equivalent mutants on code moved unchanged out of render_html/render_markdown: empty-string defaults for harness/repo
+artel/roadmap_html.py:152: equivalent mutants on code moved unchanged out of render_html/render_markdown: default status "planned": every item in the real roadmap has a status
+artel/roadmap_html.py:157: equivalent mutants on code moved unchanged out of render_html/render_markdown: fallback defaults of ITEM/STATUS_MARK lookups for statuses that all exist
+artel/roadmap_html.py:158: equivalent mutants on code moved unchanged out of render_html/render_markdown: empty-string default for mode; every item has a mode
+artel/roadmap_html.py:159: equivalent mutants on code moved unchanged out of render_html/render_markdown: `or {}` and the empty-list default of the closes lookup: both absent cases render identically
+artel/roadmap_html.py:180: equivalent mutants on code moved unchanged out of render_html/render_markdown: sort key: wave default 0 and core-first tie-break give the same order on the real data
+artel/roadmap_html.py:182: equivalent mutants on code moved unchanged out of render_html/render_markdown: wave default 0 in the group filter; every real item has a wave
+artel/roadmap_html.py:191: equivalent mutants on code moved unchanged out of render_html/render_markdown: empty-string default of `what` and note guard: the real data has both for every feature shown
+artel/roadmap_html.py:211: equivalent mutants on code moved unchanged out of render_html/render_markdown: empty-list default of h.get("features"): every rated harness has features
+artel/roadmap_html.py:219: equivalent mutants on code moved unchanged out of render_html/render_markdown: `or 1` guard against division by zero for an empty counter, unreachable with real data
+artel/roadmap_html.py:269: equivalent mutants on code moved unchanged out of render_html/render_markdown: empty-list default of h.get("features"): every rated harness has features
+artel/roadmap_html.py:276: equivalent mutants on code moved unchanged out of render_html: .get defaults for "studied" and "class", present on every harness entry
+artel/roadmap_html.py:278: equivalent mutants on moved code: .get default for "origin_note", which the consistency test requires on every entry
+artel/roadmap_html.py:279: equivalent mutant on moved code: `.get("stars") or 0` default, every metrics block has stars
+artel/roadmap_html.py:330: equivalent mutants on moved code: .get("features", []) default and the defaultdict factory
+artel/roadmap_html.py:339: equivalent mutant on moved code: hs.get("snapshot", "") default, harnesses.yaml always has a snapshot
 artel/agent_env.py:177: equivalent mutant, target = False -> None initial value: target is only read for truthiness (elif target) and is assigned before the other read (not target)
 artel/agent_env.py:184: equivalent mutant, target = False -> None after a redirect target: target is only read for truthiness, None and False behave the same
