@@ -1080,7 +1080,8 @@ items:
   - id: M0-check-parse
     wave: 10
     mode: design
-    status: in_progress
+    status: done
+    result: "merged b6f8451"
     title: "Quote-aware parsing of plan checks (no false \"missing programs\", no needless expensive replan)"
     source: {harness: Arteliq, repo: MisterReds/arteliq, paths: [docs/SPEC.md]}
     acceptance: ["branch fix/check-program-parse merged with green CI"]
@@ -1108,7 +1109,8 @@ items:
   - id: M0-dev-budget
     wave: 10
     mode: design
-    status: planned
+    status: done
+    result: "rules in CLAUDE.md; /setup.cfg and mutants/ ignored"
     title: Development token budget rules in CLAUDE.md; gate temp files ignored
     source: {harness: Arteliq, repo: MisterReds/arteliq, paths: [docs/SPEC.md]}
     acceptance: ["rules written; setup.cfg and mutants/ in .gitignore"]
@@ -1118,10 +1120,10 @@ items:
     wave: 11
     mode: design
     status: planned
-    title: "Expensive tier diet: plan on the mid tier with an expensive plan review; audit from an evidence digest"
+    title: "Planning and acceptance by orchestration v2: plan on the mid profile checked by a code plan lint; acceptance by another provider as a project step; no strong-model plan review"
     source: {harness: Arteliq, repo: MisterReds/arteliq, paths: [docs/SPEC.md]}
     after: [M0-check-parse]
-    acceptance: ["S uses at most two expensive calls and stays under the agreed expensive-token cap"]
+    acceptance: ["S makes no strong-tier call unless a task escalates; a plan with an uncovered criterion or a missing program is returned once by the lint"]
   - id: M1-thresholds
     wave: 11
     mode: design
@@ -1140,9 +1142,9 @@ items:
     wave: 11
     mode: design
     status: planned
-    title: "Control arm: the same scenario and budget by one agent session without orchestration; p50/p95 task time"
+    title: "Three arms on one scenario and budget: one agent session without Arteliq, solo, team; goal with independent verdict, owner interventions, p50/p95 time, tokens by profile"
     source: {harness: Arteliq, repo: MisterReds/arteliq, paths: [docs/SPEC.md]}
-    acceptance: ["arteliq acceptance writes both columns to the registry"]
+    acceptance: ["arteliq acceptance writes the three columns to the registry; tokens per task are reported, not used as the criterion for the team"]
   - id: M1-s-x3
     wave: 11
     mode: design
@@ -1348,3 +1350,131 @@ items:
     title: English interface next to Russian
     source: {harness: Arteliq, repo: MisterReds/arteliq, paths: [docs/SPEC.md]}
     acceptance: ["every dashboard and CLI string has an English variant selectable per owner"]
+
+  # ---- orchestration v2 (docs/ORCHESTRATION.md), 2026-11-11 ----
+  - id: M1-solo-mode
+    wave: 11
+    mode: design
+    status: planned
+    title: 'Solo by default: one worker leads a low or medium goal in one session by a checklist with checks; the
+      rest becomes board tasks when the session''s context budget runs out'
+    source:
+      harness: Arteliq
+      repo: MisterReds/arteliq
+      paths:
+      - docs/ORCHESTRATION.md
+    after:
+    - M1-expensive-diet
+    acceptance:
+    - S completes in solo with the contract, discriminating checks, independent acceptance and the journal intact;
+      an exhausted context budget moves the open items to the board
+  - id: M1-effort-ladder
+    wave: 11
+    mode: design
+    status: planned
+    title: 'Escalation ladder for a task: first attempt at medium effort, retry at high effort, environment diagnosis
+      on a repeated cause, then the strong profile in a new session, then the manager'
+    source:
+      harness: Arteliq
+      repo: MisterReds/arteliq
+      paths:
+      - docs/ORCHESTRATION.md
+    acceptance:
+    - a test per step; a project with no stuck task records no strong-tier call; each step is a journal entry with
+      its reason
+  - id: M1-native-tiers
+    wave: 11
+    mode: design
+    status: planned
+    title: 'Defect: API runs put every role on the default strongest model because the native profile table is empty'
+    source:
+      harness: Arteliq
+      repo: MisterReds/arteliq
+      paths:
+      - docs/ORCHESTRATION.md
+    acceptance:
+    - with provider anthropic and no overrides a worker, a reviewer and the librarian run on their own profiles; a
+      failing test first
+
+  # ---- ongoing project work (docs/PLAN-1.0.md §10), 2026-11-11 ----
+  - id: M3-project-requests
+    wave: 13
+    mode: design
+    status: planned
+    title: 'A project lives long and holds many requests: bound to an existing folder or repository; a request runs
+      on its own branch; accepting it merges and makes a rollback point'
+    source:
+      harness: Arteliq
+      repo: MisterReds/arteliq
+      paths:
+      - docs/PLAN-1.0.md
+    after:
+    - P6-fsm-orchestrator
+    acceptance:
+    - ten requests in one project keep its history; a rejected request leaves the folder byte for byte as before;
+      rollback of an accepted request restores the previous point
+  - id: M4-connections
+    wave: 14
+    mode: design
+    status: planned
+    title: 'Connections of a project: environments, keys in the system keychain, a per-project SSH key; workers use
+      a credential without seeing its value'
+    source:
+      harness: Arteliq
+      repo: MisterReds/arteliq
+      paths:
+      - docs/PLAN-1.0.md
+    after:
+    - P7-secrets
+    acceptance:
+    - a key added through the form never appears in prompts, the journal or tool results; the connection check reports
+      a reachable host; a revoked key stops working at once
+  - id: M4-actions
+    wave: 14
+    mode: design
+    status: planned
+    title: Named project actions (run, tests, publish to an environment, logs, rollback) detected from the project
+      or saved after a first run; external and irreversible ones behind a confirmation sheet
+    source:
+      harness: Arteliq
+      repo: MisterReds/arteliq
+      paths:
+      - docs/PLAN-1.0.md
+    after:
+    - M3-project-requests
+    acceptance:
+    - publish to production cannot start without the confirmation; a saved action repeats without a model call
+  - id: M5-conversation-ui
+    wave: 15
+    mode: design
+    status: planned
+    title: 'Conversation-first interface: the request stream with result cards in the centre, preview, changes and
+      files beside it; the board and the journal as a secondary view'
+    source:
+      harness: Arteliq
+      repo: MisterReds/arteliq
+      paths:
+      - docs/PLAN-1.0.md
+    after:
+    - P8-apps-over-shell
+    - M4-actions
+    acceptance:
+    - the owner sends a request, accepts it and publishes without leaving the conversation; dashboard tests; phone
+      layout
+  - id: M5-c-run
+    wave: 15
+    mode: design
+    status: planned
+    title: 'Scenario C (ongoing project): an existing repository and a series of ten requests including a publish
+      and a rollback'
+    source:
+      harness: Arteliq
+      repo: MisterReds/arteliq
+      paths:
+      - docs/PLAN-1.0.md
+    after:
+    - M5-conversation-ui
+    - M4-connections
+    acceptance:
+    - time to result per request (p50/p95), owner messages per request, cost per request and regressions recorded
+      in the registry

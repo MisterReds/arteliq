@@ -72,26 +72,29 @@
 | C-rea-pack | Reverse-engineering pack (REA) — workers can investigate binaries, JS/Electron bundles, .NET, APKs and websites | REA (Reverse Engineer Anything) (`morluto/rea`) | evolve | готово — REA as skill + CLI (arteliq skills import morluto/rea); not MCP: 207 tool schemas would cost every run |
 | A-munder-work-tokens | Count cache reads separately: budgets on work tokens, costs with cache prices | Munder Difflin (`chaitanyagiri/munder-difflin`) | evolve | готово — usage shape in/out/cached; budgets count in+out (stage B) |
 
-## M0 · Чистый стол — 0/5 готово
+## M0 · Чистый стол — 2/5 готово
 
 | Пункт | Что | Откуда | Режим | Статус |
 |---|---|---|---|---|
-| M0-check-parse | Quote-aware parsing of plan checks (no false "missing programs", no needless expensive replan) | Arteliq (`MisterReds/arteliq`) | design | в работе |
+| M0-check-parse | Quote-aware parsing of plan checks (no false "missing programs", no needless expensive replan) | Arteliq (`MisterReds/arteliq`) | design | готово — merged b6f8451 |
 | M0-run-lock | Cross-process run lock: a project runs in one process; the dashboard shows "running elsewhere" and refuses resume | Arteliq (`MisterReds/arteliq`) | design | в работе |
 | M0-release | First public release: PyPI 0.1.0, licence file, repository description and topics | Arteliq (`MisterReds/arteliq`) | design | в работе |
 | M0-ci-flakes | Root causes of the two unexplained CI failures (Windows test_remote WinError 10053; macOS 3.13) | Arteliq (`MisterReds/arteliq`) | design | план |
-| M0-dev-budget | Development token budget rules in CLAUDE.md; gate temp files ignored | Arteliq (`MisterReds/arteliq`) | design | план |
+| M0-dev-budget | Development token budget rules in CLAUDE.md; gate temp files ignored | Arteliq (`MisterReds/arteliq`) | design | готово — rules in CLAUDE.md; /setup.cfg and mutants/ ignored |
 
-## M1 · Доказательство S — 0/6 готово
+## M1 · Доказательство S — 0/9 готово
 
 | Пункт | Что | Откуда | Режим | Статус |
 |---|---|---|---|---|
 | W3-plan-review | Plan review before execution; built-in Explore / Plan / Verification subagents | Fusion / Claude Code (`lintsinghua/claude-code-book`) | design | план |
-| M1-expensive-diet | Expensive tier diet: plan on the mid tier with an expensive plan review; audit from an evidence digest | Arteliq (`MisterReds/arteliq`) | design | план |
+| M1-expensive-diet | Planning and acceptance by orchestration v2: plan on the mid profile checked by a code plan lint; acceptance by another provider as a project step; no strong-model plan review | Arteliq (`MisterReds/arteliq`) | design | план |
 | M1-thresholds | Re-specify U3 and U4: absolute expensive cap for S, share for L; U4 against the control arm | Arteliq (`MisterReds/arteliq`) | design | план |
 | M1-preflight | Acceptance preflight: interpreter, sandbox backend, both runtimes, expected runtime per role | Arteliq (`MisterReds/arteliq`) | design | план |
-| M1-control-arm | Control arm: the same scenario and budget by one agent session without orchestration; p50/p95 task time | Arteliq (`MisterReds/arteliq`) | design | план |
+| M1-control-arm | Three arms on one scenario and budget: one agent session without Arteliq, solo, team; goal with independent verdict, owner interventions, p50/p95 time, tokens by profile | Arteliq (`MisterReds/arteliq`) | design | план |
 | M1-s-x3 | S three times in a row on the owner's machine with a cross-provider verdict | Arteliq (`MisterReds/arteliq`) | design | план |
+| M1-solo-mode | Solo by default: one worker leads a low or medium goal in one session by a checklist with checks; the rest becomes board tasks when the session's context budget runs out | Arteliq (`MisterReds/arteliq`) | design | план |
+| M1-effort-ladder | Escalation ladder for a task: first attempt at medium effort, retry at high effort, environment diagnosis on a repeated cause, then the strong profile in a new session, then the manager | Arteliq (`MisterReds/arteliq`) | design | план |
+| M1-native-tiers | Defect: API runs put every role on the default strongest model because the native profile table is empty | Arteliq (`MisterReds/arteliq`) | design | план |
 
 ## M2 · Профили качества (П10) — 0/5 готово
 
@@ -103,7 +106,7 @@
 | P10-quality-profiles | Quality profiles: catalogue by result type and level, checks generated from the profile, reviewer checklist | Arteliq (`MisterReds/arteliq`) | design | план |
 | P10-fix-discipline | Fix discipline for workers and reviewer (failing test as evidence); manager attacks the premise after a repeated failure | Arteliq (`MisterReds/arteliq`) | design | план |
 
-## M3 · Ядро: каталог моделей, FSM, сторож (П4, П6) — 0/10 готово
+## M3 · Ядро: каталог моделей, FSM, сторож (П4, П6) — 0/11 готово
 
 | Пункт | Что | Откуда | Режим | Статус |
 |---|---|---|---|---|
@@ -117,8 +120,9 @@
 | P6-fsm-orchestrator | Task and project state machine with an effect-only orchestrator; team scheduling per profession; Manager removed | Arteliq (`MisterReds/arteliq`) | design | план |
 | M3-watchdog-resume | Project watchdog for progress and drift; resume after a crash or machine sleep without repeating side effects | Arteliq (`MisterReds/arteliq`) | design | план |
 | M3-arch-zero | Empty archcheck baselines: import cycles and module-level mutable state removed | Arteliq (`MisterReds/arteliq`) | design | план |
+| M3-project-requests | A project lives long and holds many requests: bound to an existing folder or repository; a request runs on its own branch; accepting it merges and makes a rollback point | Arteliq (`MisterReds/arteliq`) | design | план |
 
-## M4 · Управление и внимание владельца (П7) — 0/15 готово
+## M4 · Управление и внимание владельца (П7) — 0/17 готово
 
 | Пункт | Что | Откуда | Режим | Статус |
 |---|---|---|---|---|
@@ -137,14 +141,18 @@
 | P7-attention-outbox | Requests to the owner as structured Attention records; outgoing messages through an outbox with receipts | Arteliq (`MisterReds/arteliq`) | design | план |
 | P7-secrets | Secrets never enter model context; secrets redacted from the event log, tool results and notifications | Arteliq (`MisterReds/arteliq`) | design | план |
 | P7-proactive-observe | Proactive work in observe mode: rules from the owner, a 'would have done' record with a cost forecast in the Decision Log, a separate hard budget | Arteliq (`MisterReds/arteliq`) | design | план |
+| M4-connections | Connections of a project: environments, keys in the system keychain, a per-project SSH key; workers use a credential without seeing its value | Arteliq (`MisterReds/arteliq`) | design | план |
+| M4-actions | Named project actions (run, tests, publish to an environment, logs, rollback) detected from the project or saved after a first run; external and irreversible ones behind a confirmation sheet | Arteliq (`MisterReds/arteliq`) | design | план |
 
-## M5 · Долгий горизонт: приложения над оболочкой, L, провайдеры (П8, U2, U7) — 0/3 готово
+## M5 · Долгий горизонт: приложения над оболочкой, L, провайдеры (П8, U2, U7) — 0/5 готово
 
 | Пункт | Что | Откуда | Режим | Статус |
 |---|---|---|---|---|
 | P8-apps-over-shell | Dashboard routes, CLI and Telegram over the shell API; no direct imports of core or adapters | Arteliq (`MisterReds/arteliq`) | design | план |
 | M5-l-run | Scenario L: six hours or more on the owner's machine without a limit stop | Arteliq (`MisterReds/arteliq`) | design | план |
 | M5-u7 | S on the second provider and with a local model as executor | Arteliq (`MisterReds/arteliq`) | design | план |
+| M5-conversation-ui | Conversation-first interface: the request stream with result cards in the centre, preview, changes and files beside it; the board and the journal as a secondary view | Arteliq (`MisterReds/arteliq`) | design | план |
+| M5-c-run | Scenario C (ongoing project): an existing repository and a series of ten requests including a publish and a rollback | Arteliq (`MisterReds/arteliq`) | design | план |
 
 ## M6 · Выпуск 1.0 (П9) — 0/4 готово
 
@@ -198,4 +206,4 @@
 | `Yeachan-Heo/oh-my-claudecode` | MIT | 7 | A-omc-clarify-gate, A-omc-review-tiers, A-omc-secret-redaction | Claude Code plugin: team pipeline plan/prd/exec/verify/fix, deep-interview ambiguity gate, verification tiers, notifications with a reply listener and token red |
 | `chaitanyagiri/munder-difflin` | MIT | 6 | A-munder-work-tokens | Electron desktop app wrapping many terminal agent CLIs as an office: git-backed hive mailbox with a single committer, markdown memory, runaway circuit breaker ( |
 
-Итого: 35/108 пунктов готово.
+Итого: 37/116 пунктов готово.
