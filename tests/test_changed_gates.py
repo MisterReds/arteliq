@@ -206,3 +206,23 @@ def test_mutation_copy_holds_the_repo_data_the_tests_read(tmp_path):
     cfg = configparser.ConfigParser()
     cfg.read(tmp_path / "setup.cfg", encoding="utf-8")
     assert cfg["mutmut"]["also_copy"].split() == ["bench/", "docs/", "install.sh", "scripts/"]
+
+
+def test_failed_tests_reads_the_ids_of_a_failed_clean_run():
+    log = ("....F\rFAILED tests/test_security.py::test_hook - AssertionError: ('echo hi', 'x')\n"
+           "ERROR tests/test_a.py::test_b - OSError\nFAILED tests/test_security.py::test_hook - again\n"
+           "FAILED not/a/test.py::x\n1 failed\n")
+    assert mutation.failed_tests(log) == ["tests/test_security.py::test_hook", "tests/test_a.py::test_b"]
+    assert mutation.failed_tests("5 passed in 1s\n") == []
+
+
+def test_tests_that_fail_only_in_the_mutants_tree_are_excluded_by_config(tmp_path):
+    import configparser
+
+    (tmp_path / "artel").mkdir()
+    (tmp_path / "artel" / "a.py").write_text("x = 1\n", encoding="utf-8")
+    mutation.write_config(tmp_path, ["artel/a.py"], ["tests/test_a.py"], exclude=("tests/test_a.py::test_b",))
+    cfg = configparser.ConfigParser()
+    cfg.read(tmp_path / "setup.cfg", encoding="utf-8")
+    args = cfg["mutmut"]["pytest_add_cli_args"].split()
+    assert args[args.index("tests/test_a.py::test_b") - 1] == "--deselect"
