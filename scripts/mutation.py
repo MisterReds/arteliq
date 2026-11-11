@@ -28,6 +28,9 @@ DESELECT = (
     "tests/test_ports.py::test_no_vendor_names_in_packages",
     "tests/test_ports.py::test_fakes_satisfy_protocols",  # runtime-protocol check of the trampolined fakes
 )
+# Files outside artel/ that tests read relative to the source tree (bench/acceptance/*.yaml, docs/*.md, ...).
+COPIED = ("scripts/", "bench/", "docs/", "examples/", "registry/", "evals/", ".claude/", "pyproject.toml",
+          "harnesses.yaml", "roadmap.yaml", "studied.yaml", "README.md", "CLAUDE.md")
 SURVIVOR = re.compile(r"^\s+(?P<name>\S+): (?P<status>survived|no tests|suspicious|timeout|not checked)\s*$")
 
 
@@ -135,7 +138,9 @@ def write_config(root: Path, files: list[str], tests: list[str]) -> Path:
     if cfg.exists():
         raise SystemExit("mutation: setup.cfg exists; the gate writes its own temporary mutmut config there")
     cfg.write_text(
-        "[mutmut]\nsource_paths=artel\nalso_copy=\n    scripts/\n    bench/\n    docs/\n    examples/\n    registry/\n    evals/\n    .claude/\n    pyproject.toml\n    harnesses.yaml\n    roadmap.yaml\n    studied.yaml\n    README.md\n    CLAUDE.md\nmutate_only_covered_lines=true\nonly_mutate=\n"
+        "[mutmut]\nsource_paths=artel\nalso_copy=\n"
+        + "".join(f"    {c}\n" for c in COPIED)
+        + "mutate_only_covered_lines=true\nonly_mutate=\n"
         + "".join(f"    {f}\n" for f in files)
         + "pytest_add_cli_args=\n    -p\n    no:randomly\n    -q\n"
         + "".join(f"    --deselect\n    {d}\n" for d in DESELECT)
