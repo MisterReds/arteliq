@@ -16,7 +16,7 @@ TIERS = ("cheap", "medium", "expensive")
 DEFAULTS = {
     "enabled": True,
     # Manager = expensive; Architect/Executor/Critic = medium; Curator and routine = cheap
-    "roles": {"planner": "expensive", "manager": "expensive", "auditor": "expensive",
+    "roles": {"planner": "expensive", "manager": "expensive", "auditor": "medium",
               "worker": "medium", "reviewer": "medium", "tester": "medium", "absorber": "medium", "evolver": "medium",
               "librarian": "cheap", "refiner": "cheap", "doctor": "cheap", "curator": "cheap", "intake": "cheap",
               "concierge": "cheap"},
@@ -26,7 +26,7 @@ DEFAULTS = {
                "codex": {}},
     "expensive_budget_tokens": 600_000,   # per project: input + output of every expensive call
     "degrade_at": 0.9,                    # share of that budget after which expensive roles run on medium
-    "simple_planner_on_medium": True,     # a request the intake judged simple is planned on the medium tier
+    "simple_planner_on_medium": True,     # an ordinary request (see simple_request) is planned on the medium tier
 }
 
 
@@ -62,11 +62,12 @@ def expensive_used(project) -> int:
 
 
 def simple_request(project) -> bool:
-    """The intake judged the request simple — trusted only when the request is short and the contract small (the
-    cheap model's verdict comes from the request text, which could simply claim it)."""
+    """An ordinary request: the intake did not call it complex, and the request is short and the contract small.
+    The verdict of the cheap model alone is not trusted (it comes from the request text, which could simply claim
+    it), so size decides too; without a contract nothing says the request is ordinary."""
     c = project.meta.get("contract") or {}
-    return (c.get("complexity") == "low" and len(project.goal or "") <= 600
-            and len(c.get("deliverables") or []) <= 3 and len(c.get("constraints") or []) <= 3)
+    return (c.get("complexity") in ("low", "medium") and len(project.goal or "") <= 1500
+            and len(c.get("deliverables") or []) <= 6 and len(c.get("constraints") or []) <= 6)
 
 
 def tier_for(config: dict, role: str, project=None, budget: bool = True) -> str:
@@ -76,7 +77,7 @@ def tier_for(config: dict, role: str, project=None, budget: bool = True) -> str:
     tier = s["roles"].get(role, "medium")
     if role == "planner" and tier == "expensive" and project is not None and s["simple_planner_on_medium"] \
             and simple_request(project):
-        tier = "medium"  # the architect's tier is not needed for a simple request
+        tier = "medium"  # the architect's tier is for complex goals; the plan lint guards the rest
     if not budget:
         return tier
     if tier == "expensive" and project is not None and s["expensive_budget_tokens"]:

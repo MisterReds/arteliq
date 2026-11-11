@@ -61,7 +61,7 @@
  "artel/kernel.py:PERF203": 4,
  "artel/kernel.py:S112": 1,
  "artel/manager.py:B905": 2,
- "artel/manager.py:E501": 41,
+ "artel/manager.py:E501": 39,
  "artel/manager.py:PERF203": 3,
  "artel/manager.py:PERF401": 1,
  "artel/manager.py:S110": 2,

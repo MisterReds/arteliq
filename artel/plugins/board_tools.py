@@ -151,9 +151,28 @@ def validate_plan(workers: list, tasks: list) -> None:
         visit(k)
 
 
+MAX_PLAN_LINT_REJECTIONS = 2  # per planner run; after that the plan is accepted with its findings attached
+
+
 def submit_plan(ctx: ToolContext, project_name: str, workers: list, tasks: list) -> str:
+    """Structure errors always reject. Lint findings reject too, inside the planner's own run (one more turn, not a
+    second run), at most twice; a plan still not clean is accepted and carries the findings to the manager."""
+    from ..agent_env import missing_programs
+    from ..planlint import describe, lint_plan
+
     validate_plan(workers, tasks)
-    return _terminal(ctx, "submit_plan", {"project_name": project_name, "workers": workers, "tasks": tasks})
+    payload = {"project_name": project_name, "workers": workers, "tasks": tasks}
+    findings = lint_plan(workers, tasks, lambda checks: missing_programs(checks, ctx.project.config))[:20]
+    if findings:
+        rejections = int(ctx.state.get("plan_lint_rejections", 0))
+        reject = rejections < MAX_PLAN_LINT_REJECTIONS
+        ctx.project.log.append("manager/plan_lint", findings=findings, rejected=reject)
+        if reject:
+            ctx.state["plan_lint_rejections"] = rejections + 1
+            raise ToolError("plan lint: the plan cannot be checked as written.\n" + describe(findings)
+                            + "\nFix these and call submit_plan again.")
+        payload["lint"] = findings
+    return _terminal(ctx, "submit_plan", payload)
 
 
 def submit_contract(ctx: ToolContext, objective: str, deliverables: list, success_criteria: list,

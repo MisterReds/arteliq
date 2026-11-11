@@ -82,12 +82,12 @@
 | M0-ci-flakes | Root causes of the two unexplained CI failures (Windows test_remote WinError 10053; macOS 3.13) | Arteliq (`MisterReds/arteliq`) | design | готово — merged fe8cf81: refused POST drains the body; run.pid written atomically |
 | M0-dev-budget | Development token budget rules in CLAUDE.md; gate temp files ignored | Arteliq (`MisterReds/arteliq`) | design | готово — rules in CLAUDE.md; /setup.cfg and mutants/ ignored |
 
-## M1 · Доказательство S — 1/9 готово
+## M1 · Доказательство S — 2/9 готово
 
 | Пункт | Что | Откуда | Режим | Статус |
 |---|---|---|---|---|
-| W3-plan-review | Plan review before execution; built-in Explore / Plan / Verification subagents | Fusion / Claude Code (`lintsinghua/claude-code-book`) | design | план |
-| M1-expensive-diet | Planning and acceptance by orchestration v2: plan on the mid profile checked by a code plan lint; acceptance by another provider as a project step; no strong-model plan review | Arteliq (`MisterReds/arteliq`) | design | план |
+| W3-plan-review | Plan review before execution; built-in Explore / Plan / Verification subagents | Fusion / Claude Code (`lintsinghua/claude-code-book`) | design | готово — covered by the plan lint (artel/planlint.py); a strong-model plan review was rejected in ORCHESTRATION v2 |
+| M1-expensive-diet | Planning and acceptance by orchestration v2: plan on the mid profile checked by a code plan lint; acceptance by another provider as a project step; no strong-model plan review | Arteliq (`MisterReds/arteliq`) | design | частично — plan lint inside the planner run and medium profile for ordinary planning and audit are done; acceptance by another provider as a project step is open |
 | M1-thresholds | Re-specify U3 and U4: absolute expensive cap for S, share for L; U4 against the control arm | Arteliq (`MisterReds/arteliq`) | design | план |
 | M1-preflight | Acceptance preflight: interpreter, sandbox backend, both runtimes, expected runtime per role | Arteliq (`MisterReds/arteliq`) | design | план |
 | M1-control-arm | Three arms on one scenario and budget: one agent session without Arteliq, solo, team; goal with independent verdict, owner interventions, p50/p95 time, tokens by profile | Arteliq (`MisterReds/arteliq`) | design | план |
@@ -206,4 +206,4 @@
 | `Yeachan-Heo/oh-my-claudecode` | MIT | 7 | A-omc-clarify-gate, A-omc-review-tiers, A-omc-secret-redaction | Claude Code plugin: team pipeline plan/prd/exec/verify/fix, deep-interview ambiguity gate, verification tiers, notifications with a reply listener and token red |
 | `chaitanyagiri/munder-difflin` | MIT | 6 | A-munder-work-tokens | Electron desktop app wrapping many terminal agent CLIs as an office: git-backed hive mailbox with a single committer, markdown memory, runaway circuit breaker ( |
 
-Итого: 41/116 пунктов готово.
+Итого: 42/116 пунктов готово.

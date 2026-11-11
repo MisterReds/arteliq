@@ -162,23 +162,15 @@ def test_planner_is_told_the_available_tools(cfg, tmp_path, monkeypatch):
     assert "<tools_available>" in seen[0] and "python3" in seen[0]
 
 
-def test_unavailable_check_tool_sends_plan_back_once(cfg, tmp_path, monkeypatch):
-    from artel.plugins import scripted
-
-    seen = []
-    orig = scripted.ScriptedProvider._plan
-
-    def spy(self, messages, system):
-        seen.append(scripted._first_text(messages))
-        return orig(self, messages, system)
-
-    monkeypatch.setattr(scripted.ScriptedProvider, "_plan", spy)
+def test_unavailable_check_tool_is_fixed_inside_the_planner_run(cfg):
+    """A check nobody can run is the planner's mistake: the plan lint rejects the plan in the planner's own run
+    (one more turn, no second run) and the owner is not asked. Details: tests/test_plan_lint.py."""
     cfg = deep_merge(cfg, {"scripted": {"bad_check_tool": "nonexistent_tool_xyz"}})
     project, status = run_goal("Write a guide", cfg)
     assert status == "done"
-    assert len(seen) == 2 and "nonexistent_tool_xyz" in seen[1] and "<missing_tools>" in seen[1]
+    kinds = [e["kind"] for e in project.log.read()]
+    assert kinds.count("manager/plan_lint") == 1 and "manager/escalated" not in kinds
     assert all("nonexistent_tool_xyz" not in c for t in project.board.list() for c in t["checks"])
-    assert "manager/escalated" not in [e["kind"] for e in project.log.read()]
 
 
 def test_broken_check_is_not_the_workers_fault(cfg):

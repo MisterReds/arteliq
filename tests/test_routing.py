@@ -15,7 +15,8 @@ def _project(tmp_path, monkeypatch, extra=None):
 def test_roles_map_to_tiers_and_runtime_models(tmp_path, monkeypatch):
     cfg, p = _project(tmp_path, monkeypatch)
     assert routing.model_for(cfg, "claude_code", "planner", p) == "opus"
-    assert routing.model_for(cfg, "claude_code", "auditor", p) == "opus"
+    assert routing.model_for(cfg, "claude_code", "auditor", p) == "sonnet"  # acceptance is not the strong tier's job
+    assert routing.model_for(cfg, "claude_code", "manager", p) == "opus"
     assert routing.model_for(cfg, "claude_code", "worker", p) == "sonnet"
     assert routing.model_for(cfg, "claude_code", "librarian", p) == "haiku"
     assert routing.model_for(cfg, "codex", "worker", p) is None  # no names configured: Codex keeps its own model

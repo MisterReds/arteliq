@@ -33,7 +33,7 @@ from typing import Any
 
 from . import guardian, netprobe, policy, prompts
 from .agent import Outcome
-from .agent_env import agent_env, missing_programs, tool_inventory
+from .agent_env import agent_env, tool_inventory
 from .failures import classify, gate_failure_class
 from .project import INSTRUCTIONS_TRUNCATED, Persona, Project, ProjectBusy, find_instructions, persona_from_dict
 from .runtimes import run_agent
@@ -247,29 +247,14 @@ class Manager:
         if out.name != "submit_plan":
             raise RuntimeError(f"planning failed: {out.status} {out.error}")
         plan = out.payload
-        missing = self.plan_missing_tools(plan)
-        if missing:  # a check nobody can run is the planner's mistake: back to the planner once, the owner is not asked
-            self.note("plan_checks_unavailable", tools=missing)
-            again = run_agent(self.kernel, self.project, role="planner",
-                              system=self._with_instructions(prompts.PLANNER, "planner"), ctx=ctx, max_turns=12,
-                              purpose="plan", stop_event=self.stop, first_user=(
-                                  f"{user}\n\n<missing_tools>{', '.join(missing)}</missing_tools>\nYour previous plan has "
-                                  "checks whose first program is not installed on this machine. Plan again; write checks "
-                                  "only with the tools listed as available."))
-            if again.name == "submit_plan":
-                plan = again.payload
-                missing = self.plan_missing_tools(plan)
-            if missing:  # still unavailable: the gate will fail as an environment failure and the replanner rewrites it
-                self.note("plan_checks_unresolved", tools=missing)
+        if plan.get("lint"):  # rejected twice in the planner's own run and still there: the gates and the replanner
+            self.note("plan_lint_unresolved", findings=plan["lint"])  # deal with it; the owner is not asked
         self.apply_plan(plan)
 
     def tools_brief(self) -> str:
         have, missing = tool_inventory(self.cfg)
         return (f"<tools_available>{' '.join(have)}</tools_available>\n<tools_missing>{' '.join(missing)}</tools_missing>\n"
                 "Write checks only with available tools.")
-
-    def plan_missing_tools(self, plan: dict) -> list:
-        return missing_programs([c for t in plan.get("tasks", []) for c in t.get("checks", [])], self.cfg)
 
     def apply_plan(self, plan: dict) -> None:
         for w in plan["workers"]:

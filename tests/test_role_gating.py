@@ -55,9 +55,9 @@ def test_cheap_roles_model_and_effort(tmp_path, monkeypatch):
                        workdir=str(tmp_path / "w"))
     for role in ("librarian", "refiner", "doctor"):
         assert p.model_for(role) == "m-cheap"
-    for role in ("worker", "reviewer"):
+    for role in ("worker", "reviewer", "auditor"):
         assert p.model_for(role) == "m-medium"
-    for role in ("planner", "manager", "auditor"):
+    for role in ("planner", "manager"):  # the planner of a goal with no contract keeps the strong profile
         assert p.model_for(role) == "m-top"
     bare = Project.create("g", deep_merge(DEFAULT_CONFIG, {"provider": "anthropic"}), name="a2",
                           workdir=str(tmp_path / "w3"))

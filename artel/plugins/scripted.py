@@ -5,9 +5,9 @@ Knobs (config["scripted"]):
     review_failures: int    reject the first N reviews (exercises the retry path)
     audit_missing: int      first N audits report missing work (exercises re-planning)
     delay_s: float          sleep per call (demos: watch projects run live)
-    bad_check_tool: str     the build task's check starts with this (missing) program; a plan sent back with
-                            <missing_tools> drops it unless bad_check_persists
-    bad_check_persists: bool  keep the missing program even when the plan is sent back (exercises the replan path)
+    bad_check_tool: str     the build task's check starts with this (missing) program; a plan rejected by
+                            the plan lint drops it unless bad_check_persists
+    bad_check_persists: bool  keep the missing program even when the plan is rejected (exercises the replan path)
     idle_task: str          on attempt 1 of the task with this title, only talk (continuation -> stalled)
 """
 
@@ -97,7 +97,7 @@ class ScriptedProvider:
     def _plan(self, messages, system):
         goal = re.search(r"<goal>\s*(.*?)\s*</goal>", _first_text(messages), re.S).group(1)
         bad = self.knobs.get("bad_check_tool")
-        if bad and "<missing_tools>" in _first_text(messages) and not self.knobs.get("bad_check_persists"):
+        if bad and "plan lint" in _last_result(messages) and not self.knobs.get("bad_check_persists"):
             bad = None
         build_check = f"{bad} deliverable.md && test -s deliverable.md" if bad else "test -s deliverable.md"
         return [_text("Planning the project."), _use(

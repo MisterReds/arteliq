@@ -382,7 +382,8 @@ items:
     priority: core
     wave: 11
     mode: design
-    status: planned
+    status: done
+    result: "covered by the plan lint (artel/planlint.py); a strong-model plan review was rejected in ORCHESTRATION v2"
     note: "Folded into M1-expensive-diet (PLAN-1.0)."
     title: Plan review before execution; built-in Explore / Plan / Verification subagents
     source: {harness: Fusion / Claude Code, repo: lintsinghua/claude-code-book, paths: [en/Part-3-Advanced-Patterns/09-Sub-Agents-and-the-Fork-Pattern.md]}
@@ -1122,7 +1123,8 @@ items:
   - id: M1-expensive-diet
     wave: 11
     mode: design
-    status: planned
+    status: partial
+    result: "plan lint inside the planner run and medium profile for ordinary planning and audit are done; acceptance by another provider as a project step is open"
     title: "Planning and acceptance by orchestration v2: plan on the mid profile checked by a code plan lint; acceptance by another provider as a project step; no strong-model plan review"
     source: {harness: Arteliq, repo: MisterReds/arteliq, paths: [docs/SPEC.md]}
     after: [M0-check-parse]
