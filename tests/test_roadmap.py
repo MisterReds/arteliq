@@ -81,6 +81,21 @@ def test_next_items_order_modes_and_dependencies(tmp_path):
     assert "Волна 1 — 1/3 готово" in rm.render_markdown()
 
 
+def test_wave_titles_replace_the_default_heading(tmp_path):
+    from artel.roadmap import ABSORB_WAVE
+    from artel.roadmap_html import render_html
+
+    assert ABSORB_WAVE == 20
+    path = _toy(tmp_path)
+    path.write_text('waves:\n  1: "M1 · Доказательство"\n' + path.read_text(encoding="utf-8"), encoding="utf-8")
+    rm = Roadmap(path)
+    assert rm.wave_titles == {1: "M1 · Доказательство"}
+    md = rm.render_markdown()
+    assert "## M1 · Доказательство — 0/3 готово" in md and "Волна 1" not in md and "Волна 2 — 0/1 готово" in md
+    html = render_html(tmp_path)
+    assert "M1 · Доказательство" in html and "Волна 1" not in html and "Волна 2" in html
+
+
 def test_hypothesis_carries_donor_sources_and_license(tmp_path):
     donor = tmp_path / "donor"
     donor.mkdir()
@@ -214,7 +229,7 @@ def test_absorb_turns_findings_into_roadmap_items_and_cycle_follows_the_plan(tmp
     assert [h["repo"] for h in next_to_study(repo, reg, n=5)] == ["x/high", "x/low"]
 
     # a cycle studies nothing new here (registry patched to the already studied source) and implements the
-    # next items in plan order: wave 1 first, the absorbed wave-4 item waits its turn
+    # next items in plan order: wave 1 first, the absorbed wave-20 item waits its turn
     monkeypatch.setattr("artel.roadmap.next_to_study", lambda repo, n=1: [])
     s = ev.cycle(items=1)
     assert impls == ["roadmap:W1-a"] and s["generation"]["roadmap"] == {"W1-a": "done"}
@@ -292,3 +307,34 @@ def test_evolve_items_picks_exact_items_and_rejects_unknown_ids(tmp_path, monkey
                         lambda self, n, wave=None, ids=None, **kw: seen.update(n=n, ids=ids) or {"roadmap": {}})
     assert cli.main(["evolve", "--repo", str(repo), "--items", "W2-c, W1-a"]) == 0
     assert seen == {"n": 2, "ids": ["W2-c", "W1-a"]}
+
+
+def test_renderers_cope_with_sparse_entries_and_cap_the_closes_list(tmp_path):
+    """Items and harness entries with only the required keys render with their defaults; a long list of mechanisms
+    an item closes is cut at eight with an ellipsis, exactly eight is not."""
+    from artel.roadmap_html import render_html
+
+    (tmp_path / "roadmap.yaml").write_text(
+        "pillars:\n  - id: P1-x\n    title: Pillar\n    source: {harness: H, repo: a/b}\n    status: done\n"
+        "waves:\n  1: First\nitems:\n"
+        "  - id: I-bare\n    title: Bare item\n"
+        "  - id: I-nine\n    wave: 7\n    title: Nine closes\n    status: partial\n    mode: design\n"
+        "    source: {harness: H, repo: a/b}\n"
+        "  - id: I-eight\n    wave: 7\n    title: Eight closes\n    status: done\n    mode: evolve\n"
+        "    source: {harness: H, repo: a/b, paths: [x.md], license: MIT}\n"
+        "    acceptance: [one, two]\n    result: shipped\n    target: [artel/a.py]\n",
+        encoding="utf-8")
+    nine = "".join(f"  - {{name: F{i}, artel: planned, ref: I-nine}}\n" for i in range(9))
+    eight = "".join(f"  - {{name: G{i}, artel: planned, ref: I-eight}}\n" for i in range(8))
+    (tmp_path / "harnesses.yaml").write_text(
+        "snapshot: '2026-10-07'\nfindings: []\nharnesses:\n- repo: o/h\n  name: Hx\n  class: coding-agent\n"
+        "  origin: originator\n  origin_note: why\n  metrics: {}\n  features:\n" + nine + eight, encoding="utf-8")
+    page = render_html(tmp_path)
+    assert "Волна 7 <" in page and "First" not in page  # an untitled wave falls back to its number
+    first_eight = "; ".join(f"Hx — F{i}" for i in range(8))
+    assert f"Закрывает: {first_eight} …<" in page
+    assert "F8" not in page.split('id="I-nine"')[1].split("</div></div>")[2]
+    assert "Hx — G6; Hx — G7</div>" in page  # eight closes: all shown, no ellipsis
+    md = Roadmap.of_repo(tmp_path).render_markdown()
+    assert "## Волна 0 — 0/1 готово" in md and "## Волна 7 — 1/2 готово" in md
+    assert "| I-bare | Bare item |  (``) | None | None |" in md

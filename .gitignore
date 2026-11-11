@@ -10,3 +10,4 @@ dist/
 mutants/
 .coverage
 coverage.json
+/setup.cfg

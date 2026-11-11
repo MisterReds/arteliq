@@ -82,8 +82,8 @@ harnesses:
     ref: W2-execpolicy
   - name: Интеграция с IDE
     what: Zed, JetBrains, VS Code управляют агентом
-    artel: gap
-    ref: C-acp-server
+    artel: skip
+    note: вне плана 1.0 — ACP-сервер противоречит SPEC §2 (PLAN-1.0)
 - repo: openai/codex
   name: Codex
   class: coding-agent
@@ -216,8 +216,8 @@ harnesses:
     ref: W2-fs-grants
   - name: Интеграция с IDE
     what: Zed, JetBrains, VS Code управляют агентом
-    artel: gap
-    ref: C-acp-server
+    artel: skip
+    note: вне плана 1.0 — ACP-сервер противоречит SPEC §2 (PLAN-1.0)
 - repo: earendil-works/pi
   name: Pi
   class: coding-agent
@@ -350,8 +350,8 @@ harnesses:
     note: дашборд + CLI + PWA; публичного API для встраивания нет
   - name: Интеграция с IDE
     what: Zed, JetBrains, VS Code управляют агентом
-    artel: gap
-    ref: C-acp-server
+    artel: skip
+    note: вне плана 1.0 — ACP-сервер противоречит SPEC §2 (PLAN-1.0)
 - repo: Aider-AI/aider
   name: Aider
   class: coding-agent
