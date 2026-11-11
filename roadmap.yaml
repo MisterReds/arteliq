@@ -1088,21 +1088,24 @@ items:
   - id: M0-run-lock
     wave: 10
     mode: design
-    status: in_progress
+    status: done
+    result: "merged fe8cf81"
     title: "Cross-process run lock: a project runs in one process; the dashboard shows \"running elsewhere\" and refuses resume"
     source: {harness: Arteliq, repo: MisterReds/arteliq, paths: [docs/SPEC.md]}
     acceptance: ["subprocess test: second run refused, resume returns 409, lock freed on process death"]
   - id: M0-release
     wave: 10
     mode: design
-    status: in_progress
+    status: done
+    result: "0.1.1 on PyPI; Apache-2.0; repository description and topics are the owner's settings"
     title: "First public release: PyPI 0.1.0, licence file, repository description and topics"
     source: {harness: Arteliq, repo: MisterReds/arteliq, paths: [docs/SPEC.md]}
     acceptance: ["pip install arteliq works on a clean machine; LICENSE present"]
   - id: M0-ci-flakes
     wave: 10
     mode: design
-    status: planned
+    status: done
+    result: "merged fe8cf81: refused POST drains the body; run.pid written atomically"
     title: Root causes of the two unexplained CI failures (Windows test_remote WinError 10053; macOS 3.13)
     source: {harness: Arteliq, repo: MisterReds/arteliq, paths: [docs/SPEC.md]}
     acceptance: ["each reproduced by a test and fixed at the cause"]
