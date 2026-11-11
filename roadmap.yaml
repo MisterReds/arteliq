@@ -1130,7 +1130,7 @@ items:
     status: planned
     title: "Re-specify U3 and U4: absolute expensive cap for S, share for L; U4 against the control arm"
     source: {harness: Arteliq, repo: MisterReds/arteliq, paths: [docs/SPEC.md]}
-    acceptance: ["SPEC §1 and bench/acceptance/S.yaml updated on the owner's decision"]
+    acceptance: ["SPEC §1 and artel/data/acceptance/S.yaml updated on the owner's decision"]
   - id: M1-preflight
     wave: 11
     mode: design

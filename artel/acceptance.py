@@ -168,7 +168,7 @@ def measure_project(project) -> dict:
 def load_scenario(name: str) -> dict:
     import yaml
 
-    path = Path(__file__).parents[1] / "bench" / "acceptance" / f"{name}.yaml"
+    path = Path(__file__).parent / "data" / "acceptance" / f"{name}.yaml"  # package data: present after pip install
     if not path.is_file():
         raise FileNotFoundError(f"сценарий приёмки {name!r} не найден: {path}")
     return yaml.safe_load(path.read_text(encoding="utf-8"))

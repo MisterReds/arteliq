@@ -593,7 +593,7 @@ arteliq acceptance run S|L              # прогнать сценарий пр
 arteliq acceptance verify <проект>      # независимая проверка результата на другом рантайме
 ```
 
-Сценарии — `bench/acceptance/S.yaml` и `L.yaml`. Реестр прогонов — [`bench/acceptance/results/REGISTRY.md`](bench/acceptance/results/REGISTRY.md).
+Сценарии — `artel/data/acceptance/S.yaml` и `L.yaml`. Реестр прогонов — [`bench/acceptance/results/REGISTRY.md`](bench/acceptance/results/REGISTRY.md).
 
 | Прогон | Итог | Не прошло |
 |---|---|---|

@@ -1,6 +1,6 @@
 [project]
 name = "arteliq"
-version = "0.1.0"
+version = "0.1.1"
 description = "Self-improving multi-agent harness: goal -> project -> kanban -> workers -> verified result"
 readme = {file = "docs/PYPI.md", content-type = "text/markdown"}
 license = "Apache-2.0"
@@ -46,7 +46,7 @@ include = ["artel*"]
 [tool.setuptools.package-data]
 "artel.web" = ["index.html", "login.html", "static/*.svg", "static/*.js", "static/*.css", "static/*.webmanifest", "static/icons/*",
                "static/fonts/*"]
-"artel.data" = ["harnesses.json", "tools.yaml", "artel-root.sh", "artel-sudoers.tpl"]
+"artel.data" = ["harnesses.json", "tools.yaml", "artel-root.sh", "artel-sudoers.tpl", "acceptance/*.yaml"]
 
 # ---------------------------------------------------------------- engineering gates (docs/SPEC.md §11)
 # Existing debt is a ratchet: scripts/ruff_baseline.json / mypy_baseline.json hold today's counts; CI fails on any new
