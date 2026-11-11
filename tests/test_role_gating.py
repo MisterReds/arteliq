@@ -61,7 +61,8 @@ def test_cheap_roles_model_and_effort(tmp_path, monkeypatch):
         assert p.model_for(role) == "m-top"
     bare = Project.create("g", deep_merge(DEFAULT_CONFIG, {"provider": "anthropic"}), name="a2",
                           workdir=str(tmp_path / "w3"))
-    assert bare.model_for("librarian") == DEFAULT_CONFIG["models"]["default"]  # no names configured: the default
+    assert bare.model_for("librarian") == "claude-haiku-5-5"  # no overrides: the cheap profile, not the strongest model
+    assert bare.model_for("worker") == "claude-sonnet-5-5"
     assert [p.effort_for(r) for r in ("librarian", "refiner", "auditor")] == ["low", "low", "medium"]
     assert p.effort_for("worker") == "high"
 

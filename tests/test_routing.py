@@ -99,3 +99,17 @@ def test_a_request_cannot_talk_its_way_onto_a_cheaper_architect(tmp_path, monkey
     assert routing.tier_for(cfg, "planner", p) == "expensive"  # long request: the "low" verdict is not trusted
     off = deep_merge(cfg, {"tiers": {"simple_planner_on_medium": False}})
     assert routing.tier_for(off, "planner", p) == "expensive"
+
+
+def test_api_runs_without_overrides_put_each_role_on_its_own_profile(tmp_path, monkeypatch):
+    cfg, p = _project(tmp_path, monkeypatch)
+    p.config = deep_merge(p.config, {"provider": "anthropic"})
+    strongest = DEFAULT_CONFIG["models"]["default"]
+    worker, reviewer = p.model_for("worker"), p.model_for("reviewer")
+    librarian, intake = p.model_for("librarian"), p.model_for("intake")
+    assert worker == reviewer != strongest  # medium profile, not the strongest model
+    assert librarian == intake != worker    # cheap profile
+    assert p.model_for("planner") == strongest
+    own = deep_merge(p.config, {"tiers": {"models": {"native": {"medium": "my-model"}}}})
+    p.config = own
+    assert p.model_for("worker") == "my-model"  # an owner override still wins
