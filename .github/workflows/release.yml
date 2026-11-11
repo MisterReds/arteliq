@@ -30,6 +30,7 @@ jobs:
         run: |
           python3 -m venv /tmp/v && /tmp/v/bin/pip install dist/*.whl
           /tmp/v/bin/arteliq --help >/dev/null && /tmp/v/bin/artel --help >/dev/null
+          cd /tmp && /tmp/v/bin/python -c "from artel import acceptance; print(acceptance.load_scenario('S')['id'])"
           cd /tmp && ARTEL_HOME=/tmp/home /tmp/v/bin/arteliq run "Сделай файл hello.txt" --provider scripted
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:

@@ -10,7 +10,7 @@ never recomputed or filled in. `null` means the run produced no value.
 
 ## S-baseline (reference point "before" for the rewrite)
 
-Checks against `bench/acceptance/S.yaml`, verbatim from S-baseline.json:
+Checks against `artel/data/acceptance/S.yaml`, verbatim from S-baseline.json:
 
 | Metric | Value | Limit | ok |
 |---|---|---|---|
@@ -32,7 +32,7 @@ Defects found by this run are tracked in docs/SPEC.md §10.
 
 ## S-cloud-1 (2026-11-05, master 7e11f7e, runtime claude_code)
 
-Checks against `bench/acceptance/S.yaml`, verbatim from S-cloud-1.json:
+Checks against `artel/data/acceptance/S.yaml`, verbatim from S-cloud-1.json:
 
 | Metric | Value | Limit | ok |
 |---|---|---|---|
