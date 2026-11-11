@@ -72,14 +72,14 @@
 | C-rea-pack | Reverse-engineering pack (REA) — workers can investigate binaries, JS/Electron bundles, .NET, APKs and websites | REA (Reverse Engineer Anything) (`morluto/rea`) | evolve | готово — REA as skill + CLI (arteliq skills import morluto/rea); not MCP: 207 tool schemas would cost every run |
 | A-munder-work-tokens | Count cache reads separately: budgets on work tokens, costs with cache prices | Munder Difflin (`chaitanyagiri/munder-difflin`) | evolve | готово — usage shape in/out/cached; budgets count in+out (stage B) |
 
-## M0 · Чистый стол — 2/5 готово
+## M0 · Чистый стол — 5/5 готово
 
 | Пункт | Что | Откуда | Режим | Статус |
 |---|---|---|---|---|
 | M0-check-parse | Quote-aware parsing of plan checks (no false "missing programs", no needless expensive replan) | Arteliq (`MisterReds/arteliq`) | design | готово — merged b6f8451 |
-| M0-run-lock | Cross-process run lock: a project runs in one process; the dashboard shows "running elsewhere" and refuses resume | Arteliq (`MisterReds/arteliq`) | design | в работе |
-| M0-release | First public release: PyPI 0.1.0, licence file, repository description and topics | Arteliq (`MisterReds/arteliq`) | design | в работе |
-| M0-ci-flakes | Root causes of the two unexplained CI failures (Windows test_remote WinError 10053; macOS 3.13) | Arteliq (`MisterReds/arteliq`) | design | план |
+| M0-run-lock | Cross-process run lock: a project runs in one process; the dashboard shows "running elsewhere" and refuses resume | Arteliq (`MisterReds/arteliq`) | design | готово — merged fe8cf81 |
+| M0-release | First public release: PyPI 0.1.0, licence file, repository description and topics | Arteliq (`MisterReds/arteliq`) | design | готово — 0.1.1 on PyPI; Apache-2.0; repository description and topics are the owner's settings |
+| M0-ci-flakes | Root causes of the two unexplained CI failures (Windows test_remote WinError 10053; macOS 3.13) | Arteliq (`MisterReds/arteliq`) | design | готово — merged fe8cf81: refused POST drains the body; run.pid written atomically |
 | M0-dev-budget | Development token budget rules in CLAUDE.md; gate temp files ignored | Arteliq (`MisterReds/arteliq`) | design | готово — rules in CLAUDE.md; /setup.cfg and mutants/ ignored |
 
 ## M1 · Доказательство S — 0/9 готово
@@ -206,4 +206,4 @@
 | `Yeachan-Heo/oh-my-claudecode` | MIT | 7 | A-omc-clarify-gate, A-omc-review-tiers, A-omc-secret-redaction | Claude Code plugin: team pipeline plan/prd/exec/verify/fix, deep-interview ambiguity gate, verification tiers, notifications with a reply listener and token red |
 | `chaitanyagiri/munder-difflin` | MIT | 6 | A-munder-work-tokens | Electron desktop app wrapping many terminal agent CLIs as an office: git-backed hive mailbox with a single committer, markdown memory, runaway circuit breaker ( |
 
-Итого: 37/116 пунктов готово.
+Итого: 40/116 пунктов готово.
