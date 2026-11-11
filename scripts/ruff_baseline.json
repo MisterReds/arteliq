@@ -124,7 +124,6 @@
  "artel/roadmap_html.py:B007": 1,
  "artel/roadmap_html.py:E501": 20,
  "artel/roadmap_html.py:RUF059": 1,
- "artel/routing.py:SIM102": 1,
  "artel/runtimes/__init__.py:E501": 1,
  "artel/runtimes/__init__.py:PERF203": 1,
  "artel/runtimes/__init__.py:S110": 2,

@@ -89,3 +89,70 @@ def test_an_ordinary_goal_is_planned_and_audited_on_the_medium_profile(cfg):
     assert routing.tier_for(cfg, "planner", project) == "expensive"   # a complex goal keeps the architect
     project.set_meta(contract=None)
     assert routing.tier_for(cfg, "planner", project) == "expensive"   # no contract: nothing says it is ordinary
+
+
+def test_size_decides_with_the_intake_verdict(cfg):
+    """Each limit of an ordinary request on its own keeps the strong planner; at the limit it is still ordinary."""
+    def tier(goal_len=20, **contract):
+        project = Project.create("x" * goal_len, cfg, name=f"p{goal_len}-{len(str(contract))}")
+        project.set_meta(contract={"complexity": "low", "deliverables": ["d"], "success_criteria": ["s"], **contract})
+        return routing.tier_for(cfg, "planner", project)
+
+    assert tier() == "medium" and tier(goal_len=1500) == "medium" and tier(goal_len=1501) == "expensive"
+    assert tier(deliverables=["d"] * 6) == "medium" and tier(deliverables=["d"] * 7) == "expensive"
+    assert tier(constraints=["c"] * 6) == "medium" and tier(constraints=["c"] * 7) == "expensive"
+    assert tier(complexity="medium") == "medium" and tier(complexity="high") == "expensive"
+    off = deep_merge(cfg, {"tiers": {"simple_planner_on_medium": False}})
+    project = Project.create("short", off, name="off")
+    project.set_meta(contract={"complexity": "low", "deliverables": ["d"], "success_criteria": ["s"]})
+    assert routing.tier_for(off, "planner", project) == "expensive"
+
+
+def test_rejection_text_names_each_finding_and_what_to_do():
+    from artel.planlint import describe
+
+    text = describe(lint_plan(WORKERS, [{"key": "a", "criteria": ["x"], "checks": ["true"], "assignee": "Grace"},
+                                        {"key": "b", "criteria": ["y"]}], lambda checks: ["nope"] if checks else []))
+    lines = text.splitlines()
+    assert len(lines) == 4
+    assert lines[0].startswith("- task a: trivial_check (true)") and "can fail" in lines[0]
+    assert lines[1].startswith("- task a: unknown_assignee (Grace)") and "workers" in lines[1]
+    assert lines[2].startswith("- task a: missing_program (nope)") and "available" in lines[2]
+    assert lines[3].startswith("- task b: no_checks (no check command)") and "test -s" in lines[3]
+
+
+def test_check_detail_is_trimmed_and_unbalanced_quotes_are_not_trivial():
+    long = "echo " + "x" * 300
+    checks = [long, 'echo "open', "printf ok", "echo a; false"]
+    found = lint_plan(WORKERS, [{"key": "a", "criteria": ["x"], "checks": checks}], lambda checks: [])
+    assert [(f["rule"], len(f["detail"])) for f in found] == [("trivial_check", 120), ("trivial_check", 9)]
+
+
+def test_submit_plan_caps_findings_and_counts_rejections_per_run(cfg):
+    from artel.manager import new_kernel
+    from artel.plugins.board_tools import MAX_PLAN_LINT_REJECTIONS, submit_plan
+    from artel.tooling import ToolContext, ToolError
+
+    project = Project.create("goal", cfg, name="cap")
+    kernel = new_kernel(cfg)
+    try:
+        ctx = ToolContext(kernel, project, role="planner", workspace=project.shared)
+        tasks = [{"key": f"t{i}", "title": "t", "criteria": ["c"]} for i in range(30)]
+        for n in range(MAX_PLAN_LINT_REJECTIONS):
+            with pytest.raises(ToolError, match="plan lint") as err:
+                submit_plan(ctx, "p", [{"name": "Ada"}], tasks)
+            assert "submit_plan again" in str(err.value) and ctx.state["plan_lint_rejections"] == n + 1
+            assert ctx.terminal is None
+        assert submit_plan(ctx, "p", [{"name": "Ada"}], tasks) == "submit_plan accepted"
+        name, payload = ctx.terminal
+        assert name == "submit_plan" and len(payload["lint"]) == 20 and payload["project_name"] == "p"
+        events = [e for e in project.log.read() if e["kind"] == "manager/plan_lint"]
+        assert [len(e["findings"]) for e in events] == [20, 20, 20]
+
+        clean = ToolContext(kernel, project, role="planner", workspace=project.shared)
+        ok = [{"key": "a", "title": "t", "criteria": ["c"], "checks": ["test -s f"]}]
+        assert submit_plan(clean, "p", [{"name": "Ada"}], ok) == "submit_plan accepted"
+        assert "lint" not in clean.terminal[1] and "plan_lint_rejections" not in clean.state
+        assert len([e for e in project.log.read() if e["kind"] == "manager/plan_lint"]) == 3
+    finally:
+        kernel.shutdown(reason="run_end")

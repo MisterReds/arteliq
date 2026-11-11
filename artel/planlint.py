@@ -22,20 +22,20 @@ def cannot_fail(check: str) -> bool:
     return not words or (words[0] in CANNOT_FAIL and not any(op in check for op in OPERATORS))
 
 
+def _task_findings(task: dict, names: set, missing: Callable[[list], list]) -> list[dict]:
+    key, checks = task.get("key"), [str(c) for c in task.get("checks") or []]
+    found = [] if checks else [{"rule": "no_checks", "task": key, "detail": "no check command"}]
+    found += [{"rule": "trivial_check", "task": key, "detail": c.strip()[:120]} for c in checks if cannot_fail(c)]
+    if task.get("assignee") and task["assignee"] not in names:
+        found.append({"rule": "unknown_assignee", "task": key, "detail": str(task["assignee"])})
+    return found + [{"rule": "missing_program", "task": key, "detail": prog} for prog in missing(checks)]
+
+
 def lint_plan(workers: list, tasks: list, missing: Callable[[list], list]) -> list[dict]:
     """Findings ``{"rule", "task", "detail"}`` in task order. ``missing(checks)`` names the programs of those
     checks that are not installed (injected, so the function itself touches nothing)."""
     names = {w.get("name") for w in workers}
-    found: list[dict] = []
-    for t in tasks:
-        key, checks = t.get("key"), [str(c) for c in t.get("checks") or []]
-        if not checks:
-            found.append({"rule": "no_checks", "task": key, "detail": "no check command"})
-        found += [{"rule": "trivial_check", "task": key, "detail": c.strip()[:120]} for c in checks if cannot_fail(c)]
-        if t.get("assignee") and t["assignee"] not in names:
-            found.append({"rule": "unknown_assignee", "task": key, "detail": str(t["assignee"])})
-        found += [{"rule": "missing_program", "task": key, "detail": prog} for prog in missing(checks)]
-    return found
+    return [f for t in tasks for f in _task_findings(t, names, missing)]
 
 
 HINTS = {

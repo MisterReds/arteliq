@@ -70,20 +70,25 @@ def simple_request(project) -> bool:
             and len(c.get("deliverables") or []) <= 6 and len(c.get("constraints") or []) <= 6)
 
 
-def tier_for(config: dict, role: str, project=None, budget: bool = True) -> str:
-    """The tier a role runs on now: its configured tier; the planner on medium for a simple request; medium for the
-    expensive roles once the expensive budget is nearly spent (``budget=False`` leaves that last rule out)."""
-    s = settings(config)
+def _planned_tier(s: dict, role: str, project) -> str:
+    """The role's configured tier; the planner of an ordinary request on medium (the architect's tier is for
+    complex goals; the plan lint guards the rest)."""
     tier = s["roles"].get(role, "medium")
-    if role == "planner" and tier == "expensive" and project is not None and s["simple_planner_on_medium"] \
-            and simple_request(project):
-        tier = "medium"  # the architect's tier is for complex goals; the plan lint guards the rest
-    if not budget:
-        return tier
-    if tier == "expensive" and project is not None and s["expensive_budget_tokens"]:
-        if expensive_used(project) >= float(s["degrade_at"]) * float(s["expensive_budget_tokens"]):
-            return "medium"
-    return tier
+    ordinary = role == "planner" and project is not None and s["simple_planner_on_medium"] and simple_request(project)
+    return "medium" if tier == "expensive" and ordinary else tier
+
+
+def _budget_spent(s: dict, project) -> bool:
+    limit = s["expensive_budget_tokens"]
+    return bool(project is not None and limit and expensive_used(project) >= float(s["degrade_at"]) * float(limit))
+
+
+def tier_for(config: dict, role: str, project=None, budget: bool = True) -> str:
+    """The tier a role runs on now: its configured tier; the planner on medium for an ordinary request; medium for
+    the expensive roles once the expensive budget is nearly spent (``budget=False`` leaves that last rule out)."""
+    s = settings(config)
+    tier = _planned_tier(s, role, project)
+    return "medium" if budget and tier == "expensive" and _budget_spent(s, project) else tier
 
 
 def model_for(config: dict, runtime: str, role: str, project=None) -> str | None:
