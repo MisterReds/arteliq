@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import ast
 import difflib
+import functools
 import os
 import re
 import shutil
@@ -27,6 +28,8 @@ DESELECT = (
     "tests/test_ports.py::test_import_boundaries",
     "tests/test_ports.py::test_no_vendor_names_in_packages",
     "tests/test_ports.py::test_fakes_satisfy_protocols",  # runtime-protocol check of the trampolined fakes
+    # the module snapshots the worktree through `git ls-files`, which lists nothing in the untracked mutants/ copy
+    "tests/test_reinstall.py",
 )
 SURVIVOR = re.compile(r"^\s+(?P<name>\S+): (?P<status>survived|no tests|suspicious|timeout|not checked)\s*$")
 
@@ -80,6 +83,23 @@ def mutant_glob(path: str, cls: str | None, func: str) -> str:
     return f"{module}.xǁ{cls}ǁ{func}__mutmut_*" if cls else f"{module}.x_{func}__mutmut_*"
 
 
+@functools.lru_cache(maxsize=8)
+def parsed(source: str) -> ast.Module:
+    """One parse per source text: classify() asks about thousands of mutants of the same few files."""
+    return ast.parse(source)
+
+
+@functools.lru_cache(maxsize=8)
+def variant_bodies(mutants_source: str) -> dict[str, list[str]]:
+    """Stripped body lines of every ``..__mutmut_*`` function of mutmut's output file, keyed by function name."""
+    lines = mutants_source.splitlines()
+    return {
+        node.name: [ln.strip() for ln in lines[node.body[0].lineno - 1 : node.end_lineno]]
+        for node in ast.walk(parsed(mutants_source))
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and "__mutmut_" in node.name
+    }
+
+
 def mutated_lines(original: str, mutants_source: str, mutant_name: str) -> set[int]:
     """Lines of the real file that a mutant changes.
 
@@ -87,18 +107,16 @@ def mutated_lines(original: str, mutants_source: str, mutant_name: str) -> set[i
     (``..__mutmut_N``) with the same layout; the two are compared line by line and the differing positions are
     mapped onto the real function's lines."""
     _, cls, func = split_name(mutant_name)
-    real = find_function(ast.parse(original), cls, func)
+    real = find_function(parsed(original), cls, func)
     if real is None:
         return set()
-    suffix = mutant_name.rpartition(".")[2].rpartition("__mutmut_")[2]
+    prefix, _, suffix = mutant_name.rpartition(".")[2].rpartition("__mutmut_")
     wanted = {suffix, "orig"}
-    texts: dict[str, list[str]] = {}
-    mutants_lines = mutants_source.splitlines()
-    for node in ast.walk(ast.parse(mutants_source)):
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and "__mutmut_" in node.name:
-            tag = node.name.rpartition("__mutmut_")[2]
-            if tag in wanted and node.name.startswith(mutant_name.rpartition(".")[2].rpartition("__mutmut_")[0]):
-                texts[tag] = [ln.strip() for ln in mutants_lines[node.body[0].lineno - 1 : node.end_lineno]]
+    texts = {
+        name.rpartition("__mutmut_")[2]: body
+        for name, body in variant_bodies(mutants_source).items()
+        if name.rpartition("__mutmut_")[2] in wanted and name.startswith(prefix)
+    }
     if set(texts) != wanted:
         return {real.lineno}
     first = real.body[0].lineno  # compare bodies: the def lines differ by name
