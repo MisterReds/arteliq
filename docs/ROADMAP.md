@@ -163,7 +163,7 @@
 | M6-security-review | External review of sandbox, command policy, root wrapper and remote mode | Arteliq (`MisterReds/arteliq`) | design | план |
 | M6-onboarding | First run for a stranger: one command on a clean machine to a first verified result | Arteliq (`MisterReds/arteliq`) | design | план |
 
-## D · Десктоп — основной интерфейс (идёт параллельно этапам) — 0/4 готово
+## D · Десктоп — основной интерфейс (идёт параллельно этапам) — 0/5 готово
 
 | Пункт | Что | Откуда | Режим | Статус |
 |---|---|---|---|---|
@@ -171,6 +171,7 @@
 | D2-distribution | Installers published with every release and updated from inside the application; signed where certificates exist | Arteliq (`MisterReds/arteliq`) | design | план |
 | D3-retire-browser-ui | The browser dashboard stops being a product surface: the service is the application's local API on loopback with a per-install token; `arteliq app` starts the desktop application; the browser-window mode and the install-web-app button are removed; browser access stays only as remote access from a phone | Arteliq (`MisterReds/arteliq`) | design | план |
 | D4-native-integration | What only a desktop application can do: native folder picker to connect a project, keys in the system keychain, notifications with actions, start at login, links that open a project or a question | Arteliq (`MisterReds/arteliq`) | design | план |
+| D5-point-and-tell | Feedback tied to a place: mark a line of a change or an element of the preview and say what is wrong; the note goes to the worker with that context | Orca (`stablyai/orca`) | design | план |
 
 ## После 1.0 (найдено разбором проектов) — 0/23 готово
 
@@ -214,4 +215,4 @@
 | `Yeachan-Heo/oh-my-claudecode` | MIT | 7 | A-omc-clarify-gate, A-omc-review-tiers, A-omc-secret-redaction | Claude Code plugin: team pipeline plan/prd/exec/verify/fix, deep-interview ambiguity gate, verification tiers, notifications with a reply listener and token red |
 | `chaitanyagiri/munder-difflin` | MIT | 6 | A-munder-work-tokens | Electron desktop app wrapping many terminal agent CLIs as an office: git-backed hive mailbox with a single committer, markdown memory, runaway circuit breaker ( |
 
-Итого: 42/119 пунктов готово.
+Итого: 42/120 пунктов готово.

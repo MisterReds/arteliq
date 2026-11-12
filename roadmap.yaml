@@ -1538,3 +1538,21 @@ items:
     - D1-shell
     acceptance:
     - a project is connected and a key is added without typing a path or a value into a web form
+
+  # ---- from Orca (docs/PLAN-1.0.md section 13), ideas only ----
+  - id: D5-point-and-tell
+    wave: 18
+    mode: design
+    status: planned
+    title: 'Feedback tied to a place: mark a line of a change or an element of the preview and say what is wrong;
+      the note goes to the worker with that context'
+    source:
+      harness: Orca
+      repo: stablyai/orca
+      paths:
+      - README.md
+    after:
+    - M5-conversation-ui
+    acceptance:
+    - a note placed on a preview element reaches the worker with the element's selector and text; the next result
+      card shows what was changed for that note
