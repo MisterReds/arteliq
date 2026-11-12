@@ -135,7 +135,7 @@ def _step(e: dict, user: bool) -> dict:
 
 def _finish_step(it: dict, e: dict, user: bool) -> None:
     it["state"] = "error" if e.get("is_error") else "ok"
-    first = next((ln for ln in str(e.get("output") or "").splitlines() if ln.strip()), "")
+    first = (str(e.get("output") or "").strip().splitlines() or [""])[0]
     it["result"] = redact(clip(first)) if e.get("is_error") or not user else ""
 
 
@@ -146,7 +146,7 @@ def _apply(items: dict, e: dict, user: bool) -> None:
     elif k == "tool/result" and e.get("call_id") in items:
         _finish_step(items[e["call_id"]], e, user)
     elif k == "llm/error":
-        items[("err", e["seq"])] = {"seq": e["seq"], "ts": e["ts"], "text": "модель ответила ошибкой", "detail": "",
+        items[e["seq"]] = {"seq": e["seq"], "ts": e["ts"], "text": "модель ответила ошибкой", "detail": "",
                                     "state": "error", "result": redact(clip(e.get("error")))}
 
 
