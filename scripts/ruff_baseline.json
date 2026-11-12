@@ -11,7 +11,7 @@
  "artel/agent.py:E501": 5,
  "artel/agent.py:RUF005": 5,
  "artel/agent_env.py:E501": 3,
- "artel/analytics.py:E501": 6,
+ "artel/analytics.py:E501": 5,
  "artel/board.py:S608": 3,
  "artel/chat.py:E501": 4,
  "artel/chat.py:PERF203": 1,

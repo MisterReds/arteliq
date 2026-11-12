@@ -70,37 +70,84 @@ def stage_of(project: Project, tasks: list[dict]) -> str:
 RUNTIME_OF = (("claude-code", "claude_code"), ("codex", "codex"))
 
 
+def _agent_key(e: dict) -> tuple:
+    return (e.get("actor"), e.get("task_id"), e.get("purpose"))
+
+
+def _agent_record(e: dict) -> dict:
+    model = str(e.get("model") or "")
+    rt = e.get("runtime") or next((r for p, r in RUNTIME_OF if model.startswith(p)), "native")
+    return {"actor": e.get("actor"), "role": e.get("role"), "task_id": e.get("task_id"), "purpose": e.get("purpose"),
+            "runtime": rt, "model": model, "since": e["ts"], "last": "", "last_ts": e["ts"], "steps": 0,
+            "last_action": ""}
+
+
+def _mine(e: dict, actor, task_id) -> bool:
+    """The event belongs to this agent: same actor, and the same task when both name one."""
+    return e.get("actor") == actor and not (e.get("task_id") and task_id and e["task_id"] != task_id)
+
+
+def _note_activity(a: dict, e: dict) -> None:
+    """What an agent's record learns from one of its tool calls or errors."""
+    call = e["kind"] == "tool/call"
+    a["last"] = (e.get("tool") or e.get("name") or "") if call else f"ошибка: {str(e.get('error', ''))[:160]}"
+    a["last_action"] = action_text(e.get("tool"), e.get("input"))[0] if call else "ошибка"
+    a["steps"] += call
+    a["last_ts"] = e["ts"]
+
+
 def active_agents(events: list[dict], live: bool = True) -> list[dict]:
     """Agents running right now: an ``agent/start`` with no matching ``agent/end`` yet — who (actor, role), on which
-    runtime and model, for which task and purpose, since when, and the last thing it did. Empty when the project's
-    process is not running (an interrupted run leaves starts without ends)."""
+    runtime and model, for which task and purpose, since when, how many steps and the last thing it did. Empty when
+    the project's process is not running (an interrupted run leaves starts without ends)."""
     if not live:
         return []
     open_: dict = {}
     for e in events:
         k = e["kind"]
         if k == "agent/start":
-            model = str(e.get("model") or "")
-            rt = e.get("runtime") or next((r for p, r in RUNTIME_OF if model.startswith(p)), "native")
-            open_[(e.get("actor"), e.get("task_id"), e.get("purpose"))] = {
-                "actor": e.get("actor"), "role": e.get("role"), "task_id": e.get("task_id"), "purpose": e.get("purpose"),
-                "runtime": rt, "model": model, "since": e["ts"], "last": "", "last_ts": e["ts"], "steps": 0,
-                "last_action": ""}
+            open_[_agent_key(e)] = _agent_record(e)
         elif k == "agent/end":
-            open_.pop((e.get("actor"), e.get("task_id"), e.get("purpose")), None)
+            open_.pop(_agent_key(e), None)
         elif k in ("tool/call", "llm/error", "provider/limited"):
             for a in open_.values():
-                if a["actor"] == e.get("actor") and (not e.get("task_id") or a["task_id"] == e.get("task_id")):
-                    a["last"] = (e.get("tool") or e.get("name") or "") if k == "tool/call" else \
-                        f"ошибка: {str(e.get('error', ''))[:160]}"
-                    a["last_action"] = action_text(e.get("tool"), e.get("input"))[0] if k == "tool/call" \
-                        else "ошибка"
-                    a["steps"] += k == "tool/call"
-                    a["last_ts"] = e["ts"]
+                if _mine(e, a["actor"], a["task_id"]):
+                    _note_activity(a, e)
     return sorted(open_.values(), key=lambda a: a["since"])
 
 
 ACTIVITY_MAX = 200
+
+
+def _run_start(events: list[dict], actor, task_id, purpose) -> int | None:
+    """Index of the latest ``agent/start`` of this run, or None."""
+    return next((i for i in range(len(events) - 1, -1, -1)
+                 if events[i]["kind"] == "agent/start" and _agent_key(events[i]) == (actor, task_id, purpose)), None)
+
+
+def _step(e: dict, user: bool) -> dict:
+    text, detail = action_text(e.get("tool"), e.get("input"))
+    it = {"seq": e["seq"], "ts": e["ts"], "text": text, "detail": detail, "state": "running", "result": ""}
+    if not user:
+        it["tool"] = e.get("tool")
+    return it
+
+
+def _finish_step(it: dict, e: dict, user: bool) -> None:
+    it["state"] = "error" if e.get("is_error") else "ok"
+    first = next((ln for ln in str(e.get("output") or "").splitlines() if ln.strip()), "")
+    it["result"] = redact(_short_line(first)) if e.get("is_error") or not user else ""
+
+
+def _apply(items: dict, e: dict, user: bool) -> None:
+    k = e["kind"]
+    if k == "tool/call":
+        items[e.get("call_id") or e["seq"]] = _step(e, user)
+    elif k == "tool/result" and e.get("call_id") in items:
+        _finish_step(items[e["call_id"]], e, user)
+    elif k == "llm/error":
+        items[("err", e["seq"])] = {"seq": e["seq"], "ts": e["ts"], "text": "модель ответила ошибкой", "detail": "",
+                                    "state": "error", "result": redact(_short_line(e.get("error", "")))}
 
 
 def run_activity(events: list[dict], actor: str | None, task_id: str | None, purpose: str | None, user: bool = True,
@@ -109,37 +156,18 @@ def run_activity(events: list[dict], actor: str | None, task_id: str | None, pur
     them, or the ``limit`` before event ``before`` when paging back. ``user``: sentences only, no tool names.
     {items: [{seq, ts, text, detail, state: running|ok|error, result[, tool]}], more, open}."""
     limit = max(1, min(int(limit), ACTIVITY_MAX))
-    def same(e: dict) -> bool:
-        return e.get("actor") == actor and (not e.get("task_id") or not task_id or e["task_id"] == task_id)
-
-    start = next((i for i in range(len(events) - 1, -1, -1) if events[i]["kind"] == "agent/start" and same(events[i])
-                  and events[i].get("purpose") == purpose and events[i].get("task_id") == task_id), None)
+    start = _run_start(events, actor, task_id, purpose)
     if start is None:
         return {"items": [], "more": False, "open": False}
     items: dict = {}
     is_open = True
     for e in events[start + 1:]:
-        k = e["kind"]
-        if not same(e):
+        if not _mine(e, actor, task_id):
             continue
-        if k == "agent/end" and e.get("purpose") == purpose:
+        if e["kind"] == "agent/end" and e.get("purpose") == purpose:
             is_open = False
             break
-        if k == "tool/call":
-            text, detail = action_text(e.get("tool"), e.get("input"))
-            it = {"seq": e["seq"], "ts": e["ts"], "text": text, "detail": detail, "state": "running", "result": ""}
-            if not user:
-                it["tool"] = e.get("tool")
-            items[e.get("call_id") or e["seq"]] = it
-        elif k == "tool/result" and e.get("call_id") in items:
-            it = items[e["call_id"]]
-            it["state"] = "error" if e.get("is_error") else "ok"
-            first = next((ln for ln in str(e.get("output") or "").splitlines() if ln.strip()), "")
-            it["result"] = redact(_short_line(first)) if e.get("is_error") or not user else ""
-        elif k == "llm/error":
-            err = redact(_short_line(e.get("error", "")))
-            items[("err", e["seq"])] = {"seq": e["seq"], "ts": e["ts"], "text": "модель ответила ошибкой",
-                                        "detail": "", "state": "error", "result": err}
+        _apply(items, e, user)
     rows = [i for i in items.values() if not before or i["seq"] < before]
     return {"items": rows[-limit:], "more": len(rows) > limit, "open": is_open}
 

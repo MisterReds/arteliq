@@ -172,12 +172,10 @@ def localize_stats(s: dict) -> dict:
 
 def localize_view(view: dict) -> dict:
     """A project view (project_view), in place."""
-    for a in view.get("active") or []:
-        a["who"] = role_ru(a.get("actor"))
     for w in view.get("workers") or []:
         w["role"] = role_ru(w.get("role"))
     for a in view.get("active") or []:
-        a["role"] = role_ru(a.get("role"))
+        a["who"], a["role"] = role_ru(a.get("actor")), role_ru(a.get("role"))
     for t in (view.get("board") or {}).get("tasks") or []:
         _tr_task(t)
     if view.get("stats"):
@@ -200,17 +198,19 @@ def _clip(s: str, n: int = DETAIL_MAX) -> str:
     return s if len(s) <= n else s[:n - 1].rstrip() + "…"
 
 
+def _file_action(t: str, inp: dict) -> tuple[str, str]:
+    path = str(inp.get("file_path") or inp.get("path") or inp.get("notebook_path") or "")
+    name = PurePath(path).name if path else ""
+    return (f"{_FILE_VERBS[t]} {name}" if name else _FILE_VERBS[t]), _clip(redact(name))
+
+
 def action_text(tool: str | None, inp) -> tuple[str, str]:
     """(sentence, detail) for one tool call: «читает файл README.md», «выполняет команду» + the command, cut to
     80 characters and redacted. Unknown tools read as a generic step; the tool name is never part of the sentence."""
     t = str(tool or "").lower()
     inp = inp if isinstance(inp, dict) else {}
     if t in _FILE_VERBS:
-        path = str(inp.get("file_path") or inp.get("path") or inp.get("notebook_path") or "")
-        name = PurePath(path).name if path else ""
-        return (f"{_FILE_VERBS[t]} {name}" if name else _FILE_VERBS[t]), _clip(redact(name))
+        return _file_action(t, inp)
     if t in _SHELL_TOOLS:
         return "выполняет команду", _clip(redact(inp.get("command", "")))
-    if t in _PLAIN_VERBS:
-        return _PLAIN_VERBS[t], ""
-    return "выполняет шаг", ""
+    return _PLAIN_VERBS.get(t, "выполняет шаг"), ""
