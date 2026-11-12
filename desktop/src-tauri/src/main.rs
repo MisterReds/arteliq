@@ -132,7 +132,11 @@ fn show_message(win: &WebviewWindow, text: &str) {
 }
 
 fn open_dashboard(app: &AppHandle) {
-    let Some(win) = app.get_webview_window("main") else { return };
+    log("starting");
+    let Some(win) = app.get_webview_window("main") else {
+        log("main window is missing");
+        return;
+    };
     match connect(app) {
         Ok(url) => {
             *app.state::<Service>().url.lock().unwrap() = Some(url.clone());
