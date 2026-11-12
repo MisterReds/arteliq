@@ -51,6 +51,7 @@ waves:
   14: "M4 · Управление и внимание владельца (П7)"
   15: "M5 · Долгий горизонт: приложения над оболочкой, L, провайдеры (П8, U2, U7)"
   16: "M6 · Выпуск 1.0 (П9)"
+  18: "D · Десктоп — основной интерфейс (идёт параллельно этапам)"
   20: "После 1.0"
 
 items:
@@ -1333,13 +1334,6 @@ items:
     title: "Relay server with end-to-end encryption and the Android client, SPEC П8b"
     source: {harness: Arteliq, repo: MisterReds/arteliq, paths: [docs/SPEC.md]}
     acceptance: ["the Android client controls a project through the relay; the relay cannot read the traffic"]
-  - id: X-native-shell
-    wave: 20
-    mode: design
-    status: planned
-    title: "Native desktop shell with tray, only if the installed web app is not enough, SPEC П8a step 2"
-    source: {harness: Arteliq, repo: MisterReds/arteliq, paths: [docs/SPEC.md]}
-    acceptance: ["decision recorded after the installed web app is tried; the shell ships only if it is not enough"]
   - id: X-proactive
     wave: 20
     mode: design
@@ -1453,8 +1447,7 @@ items:
     wave: 15
     mode: design
     status: planned
-    title: 'Conversation-first interface: the request stream with result cards in the centre, preview, changes and
-      files beside it; the board and the journal as a secondary view'
+    title: "Conversation-first interface of the desktop application: the request stream with result cards in the centre; preview, changes and files beside it; the board and the journal as a secondary view"
     source:
       harness: Arteliq
       repo: MisterReds/arteliq
@@ -1483,3 +1476,83 @@ items:
     acceptance:
     - time to result per request (p50/p95), owner messages per request, cost per request and regressions recorded
       in the registry
+
+  # ---- desktop first (owner's decision 2026-11-12, docs/PLAN-1.0.md section 12) ----
+  - id: D1-shell
+    wave: 18
+    mode: design
+    status: in_progress
+    title: 'Native desktop application: a shell with its own window, tray and single instance, the backend bundled
+      inside; built for Linux, Windows and macOS in CI'
+    source:
+      harness: Arteliq
+      repo: MisterReds/arteliq
+      paths:
+      - docs/PLAN-1.0.md
+    acceptance:
+    - the built Linux application starts under a virtual display and its bundled service answers; a second launch
+      focuses the first window
+  - id: D2-distribution
+    wave: 18
+    mode: design
+    status: planned
+    title: Installers published with every release and updated from inside the application; signed where certificates
+      exist
+    source:
+      harness: Arteliq
+      repo: MisterReds/arteliq
+      paths:
+      - docs/PLAN-1.0.md
+    after:
+    - D1-shell
+    acceptance:
+    - a clean machine installs by double click and moves to the next version without a terminal
+  - id: D3-retire-browser-ui
+    wave: 18
+    mode: design
+    status: planned
+    title: 'The browser dashboard stops being a product surface: the service is the application''s local API on loopback
+      with a per-install token; `arteliq app` starts the desktop application; the browser-window mode and the install-web-app
+      button are removed; browser access stays only as remote access from a phone'
+    source:
+      harness: Arteliq
+      repo: MisterReds/arteliq
+      paths:
+      - docs/PLAN-1.0.md
+    after:
+    - D2-distribution
+    acceptance:
+    - a fresh install offers no browser URL; the phone path still works through remote access
+  - id: D4-native-integration
+    wave: 18
+    mode: design
+    status: planned
+    title: 'What only a desktop application can do: native folder picker to connect a project, keys in the system
+      keychain, notifications with actions, start at login, links that open a project or a question'
+    source:
+      harness: Arteliq
+      repo: MisterReds/arteliq
+      paths:
+      - docs/PLAN-1.0.md
+    after:
+    - D1-shell
+    acceptance:
+    - a project is connected and a key is added without typing a path or a value into a web form
+
+  # ---- from Orca (docs/PLAN-1.0.md section 13), ideas only ----
+  - id: D5-point-and-tell
+    wave: 18
+    mode: design
+    status: planned
+    title: 'Feedback tied to a place: mark a line of a change or an element of the preview and say what is wrong;
+      the note goes to the worker with that context'
+    source:
+      harness: Orca
+      repo: stablyai/orca
+      paths:
+      - README.md
+    after:
+    - M5-conversation-ui
+    acceptance:
+    - a note placed on a preview element reaches the worker with the element's selector and text; the next result
+      card shows what was changed for that note
