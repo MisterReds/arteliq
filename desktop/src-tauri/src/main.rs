@@ -164,6 +164,9 @@ fn main() {
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| focus(app)))
         .manage(Service::default())
         .setup(|app| {
+            log("setup");
+            let handle = app.handle().clone();
+            std::thread::spawn(move || open_dashboard(&handle));
             let open = MenuItem::with_id(app, "open", "Открыть Arteliq", true, None::<&str>)?;
             let toggle = MenuItem::with_id(app, "toggle", "Остановить службу", true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "Выход", true, None::<&str>)?;
@@ -209,8 +212,7 @@ fn main() {
                 }
             })
             .build(app)?;
-            let handle = app.handle().clone();
-            std::thread::spawn(move || open_dashboard(&handle));
+            log("tray ready");
             Ok(())
         })
         .on_window_event(|window, event| {
