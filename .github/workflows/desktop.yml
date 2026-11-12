@@ -36,7 +36,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf \
-            libxdo-dev libssl-dev build-essential xvfb curl
+            libxdo-dev libssl-dev build-essential xvfb curl dbus dbus-x11
 
       - name: Build the sidecar (PyInstaller onedir)
         run: |
@@ -73,7 +73,7 @@ jobs:
           export HOME="$RUNNER_TEMP/smoke-home"; mkdir -p "$HOME"
           export ARTELIQ_SIDECAR="$PWD/desktop/sidecar/dist/arteliq/arteliq" ARTEL_PORT=18798
           export WEBKIT_DISABLE_COMPOSITING_MODE=1 WEBKIT_DISABLE_DMABUF_RENDERER=1 LIBGL_ALWAYS_SOFTWARE=1
-          xvfb-run -a desktop/src-tauri/target/release/arteliq-desktop > "$RUNNER_TEMP/smoke.log" 2>&1 &
+          dbus-run-session -- xvfb-run -a desktop/src-tauri/target/release/arteliq-desktop > "$RUNNER_TEMP/smoke.log" 2>&1 &
           for i in $(seq 1 20); do grep -q "sidecar ready" "$RUNNER_TEMP/smoke.log" && break; sleep 1; done
           sleep 2
           tail -20 "$RUNNER_TEMP/smoke.log"
