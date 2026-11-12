@@ -213,6 +213,19 @@ a.back{display:inline-flex;align-items:center;gap:6px;color:var(--muted);font-we
 .hap-l li.bad .tdot{background:color-mix(in srgb,var(--bad) 16%,var(--panel));border-color:color-mix(in srgb,var(--bad) 55%,var(--panel));color:var(--bad)}
 .hap-l li.bad .tt{color:var(--bad);font-weight:600}
 .hap-l .tt{overflow-wrap:anywhere;line-height:1.45}
+.hap-l li.live .tdot{border-color:color-mix(in srgb,var(--run) 60%,var(--panel));color:var(--run);background:color-mix(in srgb,var(--run) 14%,var(--panel));animation:livepulse 2s ease-in-out infinite}
+@keyframes livepulse{0%,100%{box-shadow:0 0 0 0 color-mix(in srgb,var(--run) 35%,transparent)}50%{box-shadow:0 0 0 5px transparent}}
+.hap-l li.live.warn .tdot{border-color:color-mix(in srgb,var(--warn) 60%,var(--panel));color:var(--warn);background:color-mix(in srgb,var(--warn) 14%,var(--panel));animation:none}
+.hap-l li.live .lv{cursor:pointer;border-radius:var(--r2);margin:-4px -6px;padding:4px 6px}.hap-l li.live .lv:hover{background:var(--brand-soft)}
+.hap-l li.live .lv small{display:block;color:var(--muted);font-size:12px;line-height:1.45;margin-top:2px;overflow-wrap:anywhere}
+.hap-l li.live .lwarn{display:block;margin-top:4px;font-size:12.5px;line-height:1.4;color:var(--warn);overflow-wrap:anywhere}
+.worker .hint{font-size:12px;color:var(--muted)}
+.runlist{list-style:none;margin:var(--s3) 0 0;padding:0;max-height:min(52vh,420px);overflow:auto;border:1px solid var(--line);border-radius:var(--r2)}
+.runlist li{display:grid;grid-template-columns:auto 1fr;gap:0 var(--s3);padding:var(--s2) var(--s3);border-bottom:1px solid var(--line);font-size:13.5px}
+.runlist li:last-child{border-bottom:0}.runlist time{color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.runlist .rt{overflow-wrap:anywhere}.runlist .rd{display:block;color:var(--muted);font-family:var(--mono,monospace);font-size:12px;overflow-wrap:anywhere}
+.runlist .rs{display:block;font-size:12px;color:var(--muted)}.runlist li.error .rs{color:var(--bad)}.runlist li.ok .rs{color:var(--ok)}.runlist li.running .rs{color:var(--run)}
+.runnote{margin:var(--s2) 0 0;font-size:13px}.runnote.warn{color:var(--warn)}
 .hap-l time{display:block;color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums;margin-top:2px}
 /* ---- tables ---- */
 table{width:100%;border-collapse:separate;border-spacing:0;background:var(--panel);border:1px solid var(--line);border-radius:var(--r2);overflow:hidden;font-size:13.5px;box-shadow:var(--sh1)}
@@ -343,7 +356,7 @@ body:not(.devmode) .dev{display:none!important}
 <dialog id="dlg2" style="width:min(480px,94vw)"></dialog>
 <div class="toasts" id="toasts" aria-live="polite"></div>
 <script src="/static/files.js?v=2"></script>
-<script src="/static/desk.js?v=2"></script>
+<script src="/static/desk.js?v=3"></script>
 <script>
 // --- brand: role icons (16px line icons, currentColor) ----------------------------------------------
 const RI={
@@ -523,7 +536,7 @@ function openNew(pre){$('#dlgbody').innerHTML=`<h3>Что нужно сдела�
     catch(e){go.disabled=false;go.textContent='Запустить'}}}
 $('#newbtn').onclick=()=>openNew();
 
-function route(){state.lastLive=undefined;clearInterval(timer);clearInterval(resPoll);if(es){es.close();es=null}
+function route(){state.lastLive=undefined;clearInterval(timer);clearInterval(state.hapT);clearInterval(resPoll);if(es){es.close();es=null}
   if(location.hash==='#/new'){location.replace('#/portfolio');openNew();return}  // manifest shortcut «Новый проект»
   const h=location.hash.slice(2)||'portfolio';const [v,arg]=h.split('/');
   document.querySelectorAll('#nav a').forEach(a=>{const on=a.dataset.v===v;a.classList.toggle('on',on);if(on)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current')});
@@ -630,7 +643,7 @@ async function project(slug){state.slug=slug;state.events=[];state.fv=null;state
       <div class="feedhead usr"><b>Что происходит</b><button class="feedbtn closefeed" aria-label="Закрыть">${icon('x')}</button></div><div id="hap" class="usr hap" aria-live="polite"></div>
       <div class="dev devfeed"><div class="feedhead"><input id="filter" aria-label="Поиск по ленте" placeholder="Поиск по ленте: имя, задача, слово…"><button class="feedbtn closefeed" aria-label="Закрыть ленту">${icon('x')}</button></div><div id="events"></div></div></section></div>`;
   $('#filter').oninput=()=>{$('#events').innerHTML='';state.events.forEach(appendEvent)};document.querySelectorAll('.closefeed').forEach(b=>b.onclick=()=>$('#feed').classList.remove('show'));
-  await refresh().catch(()=>{});
+  await refresh().catch(()=>{});clearInterval(state.hapT);state.hapT=setInterval(()=>{if(state.v&&!document.hidden)drawHap(state.v)},15000);
   es=new EventSource(`/api/projects/${encodeURIComponent(slug)}/events?after=0`);
   es.onmessage=m=>{const e=JSON.parse(m.data);state.events.push(e);if(state.events.length>5000)state.events.shift();appendEvent(e);
     if(/^file\//.test(e.kind)&&state.ptab==='files'&&state.fv){clearTimeout(state.fvT);state.fvT=setTimeout(()=>state.fv&&state.fv.reload(),800)}
@@ -673,8 +686,35 @@ async function sendReply({id,slug,btn,ta,after}){const body=(ta?ta.value:'').tri
     toast('Ответ отправлен. Исполнитель продолжит работу.',{id:'reply'});if(ta)ta.value='';
   }catch(err){btn.disabled=false;btn.textContent=label;toast('Не удалось отправить ответ: '+(err.message||'ошибка'),{bad:true,id:'reply',action:{label:'Повторить',fn:()=>sendReply({id,slug,btn,ta,after})}});return}
   dlgEl.open&&dlgEl.close();after()}
-function drawHap(v){const h=(v.happenings||[]).slice().reverse(),ic={ok:'check',bad:'alert'};
-  setHTML($('#hap'),h.length?`<ol class="hap-l">${h.map(x=>`<li class="${esc(x.tone)}"><span class="tdot" aria-hidden="true">${ic[x.tone]?icon(ic[x.tone]):''}</span><div><div class="tt">${esc(x.text)}</div><time title="${esc(fmtHM(x.ts))}">${esc(ago(x.ts))} · ${esc(fmtHM(x.ts))}</time></div></li>`).join('')}</ol>`:emptyHtml('feed','Пока тишина','Здесь появятся ключевые события: задача принята, нужен ваш ответ, проект готов.'))}
+// «Что происходит»: the running agents first (live, with a calm note when one has been quiet), then the key events
+function liveHap(v){const now=Date.now()/1000,tt=id=>{const t=((v.board||{}).tasks||[]).find(x=>x.id===id);return t?t.title:''};
+  const a=(v.active||[]).map(x=>({x,e:ArtelDesk.liveEntry(x,now,tt)}));
+  const li=a.map(({x,e})=>`<li class="live${e.stalled?' warn':''}"><span class="tdot" aria-hidden="true"></span><div class="lv" data-run="${esc(x.actor||'')}" data-rtask="${esc(x.task_id||'')}" data-rpurpose="${esc(x.purpose||'')}" aria-label="${esc(e.who+': открыть ход работы')}"><div class="tt"><b>${esc(e.who)}</b> · ${esc(e.what)}</div>
+    <small>с ${esc(fmtHM(e.since))} · ${esc(e.steps)}${e.last?' · '+esc(e.last)+', '+esc(ago(e.last_ts)):''}</small>${e.warn?`<span class="lwarn" role="status">${icon('warn')} ${esc(e.warn)}</span>`:''}</div></li>`);
+  if(!li.length&&v.live)li.push('<li class="live"><span class="tdot" aria-hidden="true"></span><div><div class="tt">Проект запущен, ждём первого шага</div></div></li>');
+  return li.join('')}
+function drawHap(v){const h=(v.happenings||[]).slice().reverse(),ic={ok:'check',bad:'alert'},lv=liveHap(v);
+  setHTML($('#hap'),h.length||lv?`<ol class="hap-l">${lv}${h.map(x=>`<li class="${esc(x.tone)}"><span class="tdot" aria-hidden="true">${ic[x.tone]?icon(ic[x.tone]):''}</span><div><div class="tt">${esc(x.text)}</div><time title="${esc(fmtHM(x.ts))}">${esc(ago(x.ts))} · ${esc(fmtHM(x.ts))}</time></div></li>`).join('')}</ol>`:emptyHtml('feed','Пока тишина','Здесь появятся ключевые события: задача принята, нужен ваш ответ, проект готов.'));
+  wireRuns($('#hap'))}
+// the details of one agent's current run: its last steps (humanised in user mode), refreshed while the dialog is open
+const wireRuns=root=>root&&root.querySelectorAll('[data-run]').forEach(c=>onAct(c,()=>showRun({actor:c.dataset.run,task_id:c.dataset.rtask,purpose:c.dataset.rpurpose})));
+function showRun(r){const slug=state.slug,items=new Map();let more=false,open=true,gen=++state.runGen||(state.runGen=1);
+  const ag=((state.v&&state.v.active)||[]).find(x=>x.actor===r.actor&&(x.task_id||'')===r.task_id&&(x.purpose||'')===r.purpose)||{actor:r.actor,purpose:r.purpose,task_id:r.task_id};
+  const e0=ArtelDesk.liveEntry(ag,Date.now()/1000,id=>{const t=((state.v||{}).board||{}).tasks;const x=t&&t.find(y=>y.id===id);return x?x.title:''});
+  dlg(`<h3>${esc(e0.who)} · ${esc(e0.what)}</h3><div class="stat">с ${esc(fmtHM(e0.since||0))}</div><div id="runnote" class="runnote" aria-live="polite"></div>
+    <button id="runmore" hidden>Показать ещё</button><ol class="runlist" id="runlist" aria-label="Последние действия"></ol>`);
+  const url=b=>MQ(`/api/projects/${encodeURIComponent(slug)}/activity?actor=${encodeURIComponent(r.actor)}&purpose=${encodeURIComponent(r.purpose)}${r.task_id?'&task_id='+encodeURIComponent(r.task_id):''}&limit=50${b?'&before='+b:''}`);
+  const STT={running:'выполняется…',ok:'готово',error:'ошибка'};
+  const draw=()=>{const l=$('#runlist');if(!l)return;const atEnd=l.scrollHeight-l.scrollTop-l.clientHeight<24,rows=[...items.values()].sort((a,b)=>a.seq-b.seq);
+    l.innerHTML=rows.length?rows.map(i=>`<li class="${esc(i.state)}"><time>${esc(fmtT(i.ts))}</time><div><span class="rt">${esc(i.text)}${DEV&&i.tool?` <span class="dev">(${esc(i.tool)})</span>`:''}</span>${i.detail&&/команд/.test(i.text)?`<span class="rd">${esc(i.detail)}</span>`:''}<span class="rs">${esc(STT[i.state]||i.state)}${i.result?': '+esc(i.result):''}</span></div></li>`).join(''):'<li><div class="stat">Пока нет действий.</div></li>';
+    if(atEnd)l.scrollTop=l.scrollHeight;
+    const m=$('#runmore');if(m)m.hidden=!more;
+    const n=$('#runnote'),last=rows.length?rows[rows.length-1].ts:ag.since,idle=Date.now()/1000-(last||0);
+    if(n){n.className='runnote'+(open&&idle>180?' warn':'');n.textContent=!open?'Запуск завершён.':idle>180?`Нет активности ${idle/60|0} мин — возможно, длинная команда или ожидание модели.`:''}};
+  const load=async(before)=>{try{const j=await api(url(before));if(gen!==state.runGen||!$('#runlist')||!j||j.error)return;
+    const first=!items.size;j.items.forEach(i=>items.set(i.seq,i));open=j.open;if(before||first)more=j.more;draw()}catch(e){}};
+  $('#runmore').onclick=()=>{const first=Math.min(...items.keys());load(first)};
+  load(0);const t=setInterval(()=>{if(!dlgEl.open||gen!==state.runGen||!$('#runlist')){clearInterval(t);return}if(!document.hidden)load(0)},2500)}
 // board: four columns for a person (+ «Нужно вам» when something waits for them); the six raw ones in the developer mode
 const UCOLS=[['queue','Очередь',['todo','ready']],['running','Делается',['running']],['review','Проверяется',['review']],['done','Готово',['done']],['need','Нужно вам',['blocked']]];
 function boardHtml(tasks){
@@ -727,6 +767,7 @@ async function refresh(){const v=await api(MQ(`/api/projects/${encodeURIComponen
   $('#pm').dataset.tab=state.ptab;
   document.querySelectorAll('.card,.alert[data-t]').forEach(c=>onAct(c,()=>showTask(c.dataset.t)));
   document.querySelectorAll('.worker[data-w]').forEach(c=>onAct(c,()=>showWorker(c.dataset.w)));
+  wireRuns($('#pm-main'));
   wireAsks($('#pm-main'),refresh);
   document.querySelectorAll('[data-ptab]').forEach(b=>b.onclick=()=>setTab(b.dataset.ptab));
   document.querySelectorAll('[data-bc]').forEach(b=>b.onclick=()=>{state.bcol=b.dataset.bc;document.querySelectorAll('[data-bc]').forEach(x=>{const on=x===b;x.classList.toggle('on',on);x.setAttribute('aria-selected',on)});
@@ -775,9 +816,9 @@ function contractBox(c){if(!c)return '';const L=(t,xs)=>(xs||[]).length?`<div st
   return `<details style="margin-top:6px"><summary class="stat">Как понята задача${c.complexity?' · сложность '+esc({low:'низкая',medium:'средняя',high:'высокая'}[c.complexity]||c.complexity):''}</summary>
     ${L('Результат',c.deliverables)}${L('Критерии успеха',c.success_criteria)}${L('Ограничения',c.constraints)}${L('Не входит',c.out_of_scope)}${L('Допущения',c.assumptions)}${L('Открытые вопросы',c.open_questions)}</details>`}
 function activeBox(v,tasks){const a=v.active||[];
-  const rows=a.map(x=>{const t=x.task_id?tasks.find(t=>t.id===x.task_id):null;return `<div class="worker"><span class="wi">${ri(x.role||'worker')}</span><div class="wb"><b>${esc(x.actor||x.role)}</b><span class="role">${esc(PURPOSE[x.purpose]||x.purpose||x.role||'')}</span></div>
+  const rows=a.map(x=>{const t=x.task_id?tasks.find(t=>t.id===x.task_id):null;return `<div class="worker" data-run="${esc(x.actor||'')}" data-rtask="${esc(x.task_id||'')}" data-rpurpose="${esc(x.purpose||'')}" aria-label="${esc((x.who||x.actor||x.role||'Исполнитель')+': открыть ход работы')}"><span class="wi">${ri(x.role||'worker')}</span><div class="wb"><b>${esc(x.who||x.actor||x.role)}</b><span class="role">${esc(PURPOSE[x.purpose]||x.purpose||x.role||'')}</span></div>
     <div class="wf"><div class="now"><span class="sdot"></span>${t?esc(t.title):x.purpose==='plan'?'план проекта':'работает'}</div>
-    <div class="stat"><span class="dev">${esc(x.runtime)}${x.model?' · '+esc(x.model):''} · </span>с ${fmtT(x.since)}${x.last?' · последнее: '+esc(x.last)+' '+ago(x.last_ts):''}</div></div></div>`}).join('');
+    <div class="stat"><span class="dev">${esc(x.runtime)}${x.model?' · '+esc(x.model):''} · </span>с ${fmtT(x.since)}${x.last?' · последнее: '+esc(DEV?x.last:(x.last_action||x.last))+' '+ago(x.last_ts):''}</div><div class="hint">Нажмите, чтобы увидеть ход работы</div></div></div>`}).join('');
   const banner=v.live&&v.stage==='planning'&&!a.length?'<div class="alert">Запускаю планировщика…</div>':'';
   const pr=(v.recent_problems||[]).slice(-3).map(e=>`<div class="stat">${fmtT(e.ts)} · ${esc(e.kind)} · ${esc(String(e.error||e.reason||e.rationale||e.to||'').slice(0,240))}</div>`).join('');
   if(!v.live&&!pr)return '';

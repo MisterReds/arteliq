@@ -10,8 +10,9 @@ import time
 from collections import defaultdict
 from pathlib import Path
 
-from .humanize import block_ask_id, block_question
+from .humanize import DETAIL_MAX, action_text, block_ask_id, block_question
 from .project import Project, artel_home
+from .reports import redact
 from .runtimes import runtime_for
 
 # USD per million tokens (input, output). Unknown models report no cost.
@@ -83,7 +84,8 @@ def active_agents(events: list[dict], live: bool = True) -> list[dict]:
             rt = e.get("runtime") or next((r for p, r in RUNTIME_OF if model.startswith(p)), "native")
             open_[(e.get("actor"), e.get("task_id"), e.get("purpose"))] = {
                 "actor": e.get("actor"), "role": e.get("role"), "task_id": e.get("task_id"), "purpose": e.get("purpose"),
-                "runtime": rt, "model": model, "since": e["ts"], "last": "", "last_ts": e["ts"]}
+                "runtime": rt, "model": model, "since": e["ts"], "last": "", "last_ts": e["ts"], "steps": 0,
+                "last_action": ""}
         elif k == "agent/end":
             open_.pop((e.get("actor"), e.get("task_id"), e.get("purpose")), None)
         elif k in ("tool/call", "llm/error", "provider/limited"):
@@ -91,8 +93,60 @@ def active_agents(events: list[dict], live: bool = True) -> list[dict]:
                 if a["actor"] == e.get("actor") and (not e.get("task_id") or a["task_id"] == e.get("task_id")):
                     a["last"] = (e.get("tool") or e.get("name") or "") if k == "tool/call" else \
                         f"ошибка: {str(e.get('error', ''))[:160]}"
+                    a["last_action"] = action_text(e.get("tool"), e.get("input"))[0] if k == "tool/call" \
+                        else "ошибка"
+                    a["steps"] += k == "tool/call"
                     a["last_ts"] = e["ts"]
     return sorted(open_.values(), key=lambda a: a["since"])
+
+
+ACTIVITY_MAX = 200
+
+
+def run_activity(events: list[dict], actor: str | None, task_id: str | None, purpose: str | None, user: bool = True,
+                 limit: int = 50, before: int = 0) -> dict:
+    """The steps of one agent's latest run (from its last ``agent/start`` on), oldest first: the newest ``limit`` of
+    them, or the ``limit`` before event ``before`` when paging back. ``user``: sentences only, no tool names.
+    {items: [{seq, ts, text, detail, state: running|ok|error, result[, tool]}], more, open}."""
+    limit = max(1, min(int(limit), ACTIVITY_MAX))
+    def same(e: dict) -> bool:
+        return e.get("actor") == actor and (not e.get("task_id") or not task_id or e["task_id"] == task_id)
+
+    start = next((i for i in range(len(events) - 1, -1, -1) if events[i]["kind"] == "agent/start" and same(events[i])
+                  and events[i].get("purpose") == purpose and events[i].get("task_id") == task_id), None)
+    if start is None:
+        return {"items": [], "more": False, "open": False}
+    items: dict = {}
+    is_open = True
+    for e in events[start + 1:]:
+        k = e["kind"]
+        if not same(e):
+            continue
+        if k == "agent/end" and e.get("purpose") == purpose:
+            is_open = False
+            break
+        if k == "tool/call":
+            text, detail = action_text(e.get("tool"), e.get("input"))
+            it = {"seq": e["seq"], "ts": e["ts"], "text": text, "detail": detail, "state": "running", "result": ""}
+            if not user:
+                it["tool"] = e.get("tool")
+            items[e.get("call_id") or e["seq"]] = it
+        elif k == "tool/result" and e.get("call_id") in items:
+            it = items[e["call_id"]]
+            it["state"] = "error" if e.get("is_error") else "ok"
+            first = next((ln for ln in str(e.get("output") or "").splitlines() if ln.strip()), "")
+            it["result"] = redact(_short_line(first)) if e.get("is_error") or not user else ""
+        elif k == "llm/error":
+            err = redact(_short_line(e.get("error", "")))
+            items[("err", e["seq"])] = {"seq": e["seq"], "ts": e["ts"], "text": "модель ответила ошибкой",
+                                        "detail": "", "state": "error", "result": err}
+    rows = [i for i in items.values() if not before or i["seq"] < before]
+    return {"items": rows[-limit:], "more": len(rows) > limit, "open": is_open}
+
+
+def _short_line(s) -> str:
+    s = " ".join(str(s or "").split())
+    return s if len(s) <= DETAIL_MAX else s[:DETAIL_MAX - 1].rstrip() + "…"
 
 
 def task_timelines(events: list[dict]) -> dict[str, list]:

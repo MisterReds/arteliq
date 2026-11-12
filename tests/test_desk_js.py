@@ -121,3 +121,41 @@ def test_verdict_without_a_numbered_list_stays_one_paragraph():
 def test_verdict_never_alters_markup_characters_so_the_page_can_escape_them():
     v = js("D.verdict(" + json.dumps("Ок: (1) <b>x</b> & y; (2) \"z\"") + ")")
     assert v["items"] == ["<b>x</b> & y", '"z"']
+
+
+def live(agent, now=1000, titles=None):
+    src = ("global.window={};require(%s);const D=window.ArtelDesk;const T=%s;"  # noqa: UP031
+           "console.log(JSON.stringify(D.liveEntry(%s,%d,id=>T[id])))"
+           % (json.dumps(str(JS)), json.dumps(titles or {}), json.dumps(agent), now))
+    out = subprocess.run(["node", "-e", src], capture_output=True, text=True, timeout=30)
+    assert out.returncode == 0, out.stderr
+    return json.loads(out.stdout)
+
+
+PLANNER = {"actor": "planner", "who": "планировщик", "purpose": "plan", "since": 880, "steps": 3,
+           "last_action": "читает файл README.md", "last_ts": 970}
+
+
+@node
+def test_live_entry_says_who_what_since_when_steps_and_the_last_action():
+    e = live(PLANNER)
+    assert e["who"] == "планировщик" and e["what"] == "план проекта" and e["steps"] == "3 шага"
+    assert e["last"] == "читает файл README.md" and e["idle"] == 30 and e["stalled"] is False and e["warn"] == ""
+
+
+@node
+def test_live_entry_names_the_task_or_review_and_handles_no_steps_yet():
+    w = live({**PLANNER, "purpose": "work", "task_id": "t1", "steps": 0, "last_action": ""}, titles={"t1": "Сайт"})
+    assert w["what"] == "задача «Сайт»" and w["steps"] == "шагов пока нет" and w["last"] == ""
+    rev = live({**PLANNER, "purpose": "review", "task_id": "t1"}, titles={"t1": "Сайт"})
+    assert rev["what"] == "ревью «Сайт»"
+    assert live({**PLANNER, "purpose": "audit"})["what"] == "аудит цели"
+
+
+@node
+def test_live_entry_warns_calmly_after_three_minutes_without_events():
+    quiet = live(PLANNER, now=970 + 180)
+    assert quiet["stalled"] is False  # exactly three minutes is still fine
+    e = live(PLANNER, now=970 + 4 * 60 + 5)
+    assert e["stalled"] is True
+    assert e["warn"] == "нет активности 4 мин — возможно, длинная команда или ожидание модели"

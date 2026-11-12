@@ -229,6 +229,13 @@ def _annotate_tasks(tasks: list[dict], events: list[dict]) -> None:
             t["risk"], t["risk_score"], t["risk_reason"] = (risks[t["id"]][k] for k in ("risk", "score", "reason"))
 
 
+def _int(raw: str, default: int) -> int:
+    try:
+        return int(raw)
+    except ValueError:
+        return default
+
+
 def project_view(project: Project, runner: Runner, user: bool = False) -> dict:
     """The project page's payload. `user`: system strings in Russian (humanize); the dev mode keeps them raw."""
     snap = project.board.snapshot()
@@ -592,6 +599,11 @@ def make_handler(runner: Runner, auth=None):
                     self._json(runner.results.status(self._project(parts[2])))
                 elif len(parts) == 4 and parts[3] == "archive":
                     self._archive(self._project(parts[2]))
+                elif len(parts) == 4 and parts[3] == "activity":
+                    self._json(analytics.run_activity(
+                        analytics._events(self._project(parts[2])), q.get("actor", [None])[0],
+                        q.get("task_id", [None])[0], q.get("purpose", [None])[0], user=q.get("mode") == ["user"],
+                        limit=_int(q.get("limit", ["50"])[0], 50), before=_int(q.get("before", ["0"])[0], 0)))
                 elif len(parts) == 4 and parts[3] == "events":
                     self._sse(self._project(parts[2]), int(q.get("after", ["0"])[0]))
                 elif len(parts) == 4 and parts[3] == "files":

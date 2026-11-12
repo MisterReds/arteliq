@@ -62,5 +62,24 @@
     return {lead: t.slice(0, marks[0].at).trim(), items: items.map(clean), tail};
   }
 
-  window.ArtelDesk = {fresh, remember, loadShown, badgeCount, verdict};
+  // one running agent as the «Что происходит» live entry: who, what, steps, the last action; after STALL_S seconds
+  // without an event a calm note (information, not an error). `now` and `a.last_ts` are unix seconds.
+  const STALL_S = 180;
+  const plural = (n, a, b, c) => { const m = n % 100, d = n % 10; return m > 10 && m < 15 ? c : d === 1 ? a : d > 1 && d < 5 ? b : c; };
+  function liveEntry(a, now, titleOf) {
+    const title = a.task_id && titleOf ? titleOf(a.task_id) : '';
+    const named = w => (title ? w + ' «' + title + '»' : w);
+    const what = {plan: () => 'план проекта', work: () => named('задача'), review: () => named('ревью'), audit: () => 'аудит цели',
+                  intake: () => 'уточнение задачи', test: () => 'тесты', refine: () => 'улучшение харнесса',
+                  librarian: () => 'сбор навыков'}[a.purpose];
+    const steps = a.steps || 0;
+    const idle = Math.max(0, Math.round(now - (a.last_ts || a.since || now)));
+    const stalled = idle > STALL_S;
+    return {who: a.who || a.actor || a.role || 'исполнитель', what: what ? what() : 'работает', since: a.since,
+            steps: steps ? steps + ' ' + plural(steps, 'шаг', 'шага', 'шагов') : 'шагов пока нет', last: a.last_action || '',
+            last_ts: a.last_ts, idle, stalled,
+            warn: stalled ? 'нет активности ' + Math.floor(idle / 60) + ' мин — возможно, длинная команда или ожидание модели' : ''};
+  }
+
+  window.ArtelDesk = {fresh, remember, loadShown, badgeCount, verdict, liveEntry};
 })();

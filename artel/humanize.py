@@ -7,6 +7,9 @@ the page asks for ``mode=user``.
 from __future__ import annotations
 
 import re
+from pathlib import PurePath
+
+from .reports import redact
 
 ROLES = {"researcher": "исследователь", "engineer": "инженер", "reviewer": "ревьюер", "auditor": "аудитор",
          "planner": "планировщик", "manager": "менеджер", "tester": "тестировщик", "librarian": "библиотекарь",
@@ -169,6 +172,8 @@ def localize_stats(s: dict) -> dict:
 
 def localize_view(view: dict) -> dict:
     """A project view (project_view), in place."""
+    for a in view.get("active") or []:
+        a["who"] = role_ru(a.get("actor"))
     for w in view.get("workers") or []:
         w["role"] = role_ru(w.get("role"))
     for a in view.get("active") or []:
@@ -178,3 +183,34 @@ def localize_view(view: dict) -> dict:
     if view.get("stats"):
         localize_stats(view["stats"])
     return view
+
+
+# what a running agent is doing, in words: tool name -> (sentence, key of the input that names the object)
+_FILE_VERBS = {"read": "читает файл", "write": "пишет файл", "edit": "правит файл", "multiedit": "правит файл",
+               "notebookedit": "правит файл"}
+_PLAIN_VERBS = {"glob": "ищет файлы", "grep": "ищет в файлах", "ls": "смотрит папку", "webfetch": "открывает страницу",
+                "websearch": "ищет в интернете", "web_search": "ищет в интернете", "todowrite": "обновляет список дел",
+                "apply_patch": "правит файлы", "task": "поручает подзадачу"}
+_SHELL_TOOLS = {"bash", "shell"}
+DETAIL_MAX = 80
+
+
+def _clip(s: str, n: int = DETAIL_MAX) -> str:
+    s = " ".join(str(s or "").split())
+    return s if len(s) <= n else s[:n - 1].rstrip() + "…"
+
+
+def action_text(tool: str | None, inp) -> tuple[str, str]:
+    """(sentence, detail) for one tool call: «читает файл README.md», «выполняет команду» + the command, cut to
+    80 characters and redacted. Unknown tools read as a generic step; the tool name is never part of the sentence."""
+    t = str(tool or "").lower()
+    inp = inp if isinstance(inp, dict) else {}
+    if t in _FILE_VERBS:
+        path = str(inp.get("file_path") or inp.get("path") or inp.get("notebook_path") or "")
+        name = PurePath(path).name if path else ""
+        return (f"{_FILE_VERBS[t]} {name}" if name else _FILE_VERBS[t]), _clip(redact(name))
+    if t in _SHELL_TOOLS:
+        return "выполняет команду", _clip(redact(inp.get("command", "")))
+    if t in _PLAIN_VERBS:
+        return _PLAIN_VERBS[t], ""
+    return "выполняет шаг", ""
