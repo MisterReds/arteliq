@@ -151,7 +151,7 @@
 | P8-apps-over-shell | Dashboard routes, CLI and Telegram over the shell API; no direct imports of core or adapters | Arteliq (`MisterReds/arteliq`) | design | план |
 | M5-l-run | Scenario L: six hours or more on the owner's machine without a limit stop | Arteliq (`MisterReds/arteliq`) | design | план |
 | M5-u7 | S on the second provider and with a local model as executor | Arteliq (`MisterReds/arteliq`) | design | план |
-| M5-conversation-ui | Conversation-first interface: the request stream with result cards in the centre, preview, changes and files beside it; the board and the journal as a secondary view | Arteliq (`MisterReds/arteliq`) | design | план |
+| M5-conversation-ui | Conversation-first interface of the desktop application: the request stream with result cards in the centre; preview, changes and files beside it; the board and the journal as a secondary view | Arteliq (`MisterReds/arteliq`) | design | план |
 | M5-c-run | Scenario C (ongoing project): an existing repository and a series of ten requests including a publish and a rollback | Arteliq (`MisterReds/arteliq`) | design | план |
 
 ## M6 · Выпуск 1.0 (П9) — 0/4 готово
@@ -163,7 +163,16 @@
 | M6-security-review | External review of sandbox, command policy, root wrapper and remote mode | Arteliq (`MisterReds/arteliq`) | design | план |
 | M6-onboarding | First run for a stranger: one command on a clean machine to a first verified result | Arteliq (`MisterReds/arteliq`) | design | план |
 
-## После 1.0 (найдено разбором проектов) — 0/24 готово
+## D · Десктоп — основной интерфейс (идёт параллельно этапам) — 0/4 готово
+
+| Пункт | Что | Откуда | Режим | Статус |
+|---|---|---|---|---|
+| D1-shell | Native desktop application: a shell with its own window, tray and single instance, the backend bundled inside; built for Linux, Windows and macOS in CI | Arteliq (`MisterReds/arteliq`) | design | в работе |
+| D2-distribution | Installers published with every release and updated from inside the application; signed where certificates exist | Arteliq (`MisterReds/arteliq`) | design | план |
+| D3-retire-browser-ui | The browser dashboard stops being a product surface: the service is the application's local API on loopback with a per-install token; `arteliq app` starts the desktop application; the browser-window mode and the install-web-app button are removed; browser access stays only as remote access from a phone | Arteliq (`MisterReds/arteliq`) | design | план |
+| D4-native-integration | What only a desktop application can do: native folder picker to connect a project, keys in the system keychain, notifications with actions, start at login, links that open a project or a question | Arteliq (`MisterReds/arteliq`) | design | план |
+
+## После 1.0 (найдено разбором проектов) — 0/23 готово
 
 | Пункт | Что | Откуда | Режим | Статус |
 |---|---|---|---|---|
@@ -188,7 +197,6 @@
 | A-omc-review-tiers | Review effort scaled to the change: light review for small diffs, full review for large or sensitive ones | oh-my-claudecode (`Yeachan-Heo/oh-my-claudecode`) | evolve | план |
 | X-evolution-unfreeze | Unfreeze evolution: candidates chosen on a working set, confirmed on a held-out set | Arteliq (`MisterReds/arteliq`) | design | план |
 | X-relay-android | Relay server with end-to-end encryption and the Android client, SPEC П8b | Arteliq (`MisterReds/arteliq`) | design | план |
-| X-native-shell | Native desktop shell with tray, only if the installed web app is not enough, SPEC П8a step 2 | Arteliq (`MisterReds/arteliq`) | design | план |
 | X-proactive | Proactive work in auto mode: verified results only, usefulness measured, a rule below the threshold switches itself off (SPEC §14) | Arteliq (`MisterReds/arteliq`) | design | план |
 | X-ui-english | English interface next to Russian | Arteliq (`MisterReds/arteliq`) | design | план |
 
@@ -206,4 +214,4 @@
 | `Yeachan-Heo/oh-my-claudecode` | MIT | 7 | A-omc-clarify-gate, A-omc-review-tiers, A-omc-secret-redaction | Claude Code plugin: team pipeline plan/prd/exec/verify/fix, deep-interview ambiguity gate, verification tiers, notifications with a reply listener and token red |
 | `chaitanyagiri/munder-difflin` | MIT | 6 | A-munder-work-tokens | Electron desktop app wrapping many terminal agent CLIs as an office: git-backed hive mailbox with a single committer, markdown memory, runaway circuit breaker ( |
 
-Итого: 42/116 пунктов готово.
+Итого: 42/119 пунктов готово.
