@@ -126,3 +126,130 @@ def test_activity_endpoint_needs_login_and_returns_the_humanised_run(served):
     assert _get(f"{base}/api/projects/nope/activity?actor=planner", sid)[0] == 404
     code, body = _get(f"{base}/api/projects/{project.slug}/activity?actor=planner&purpose=plan&limit=99999", sid)
     assert code == 200  # capped, not refused
+
+
+# ---- exact behaviour of the pieces (each assertion pins one decision) ----
+
+def _ev(seq, kind, ts=1.0, **kw):
+    return {"seq": seq, "kind": kind, "ts": ts, **kw}
+
+
+def test_action_text_exact_sentences_details_and_edges():
+    assert action_text("READ", {"file_path": "/a/b.md"}) == ("читает файл b.md", "b.md")
+    assert action_text("read", {"path": "/a/c.md"}) == ("читает файл c.md", "c.md")
+    assert action_text("NotebookEdit", {"notebook_path": "/a/n.ipynb"}) == ("правит файл n.ipynb", "n.ipynb")
+    assert action_text("MultiEdit", {"file_path": "x.py"}) == ("правит файл x.py", "x.py")
+    assert action_text("Write", {}) == ("пишет файл", "")  # no name: no trailing space
+    assert action_text("Read", "not a dict") == ("читает файл", "")
+    assert action_text("Read", {"file_path": "/a/long/" + "n" * 100}) == (
+        "читает файл " + "n" * 100, "n" * 79 + "…")
+    assert action_text(None, None) == ("выполняет шаг", "")
+    assert action_text("Bash", {"command": "  a   b\n c "}) == ("выполняет команду", "a b c")
+    assert action_text("Bash", {}) == ("выполняет команду", "")
+    assert action_text("Bash", {"command": "x" * 80})[1] == "x" * 80
+    assert action_text("Bash", {"command": "x" * 81})[1] == "x" * 79 + "…"
+    assert action_text("shell", {"command": "ab " * 40})[1] == ("ab " * 26 + "a")[:79].rstrip() + "…"
+    for tool, text in [("Glob", "ищет файлы"), ("Grep", "ищет в файлах"), ("LS", "смотрит папку"),
+                       ("WebFetch", "открывает страницу"), ("WebSearch", "ищет в интернете"),
+                       ("web_search", "ищет в интернете"), ("TodoWrite", "обновляет список дел"),
+                       ("apply_patch", "правит файлы"), ("Task", "поручает подзадачу")]:
+        assert action_text(tool, {"command": "ignored"}) == (text, "")
+
+
+def test_localize_view_translates_roles_and_names_the_agent():
+    v = localize_view({"workers": [{"role": "engineer"}],
+                       "active": [{"actor": "Ann", "role": "engineer"}, {"actor": "auditor", "role": "auditor"}]})
+    assert v["workers"][0]["role"] == "инженер"
+    assert v["active"] == [{"actor": "Ann", "role": "инженер", "who": "Ann"},
+                           {"actor": "auditor", "role": "аудитор", "who": "аудитор"}]
+    assert localize_view({}) == {}
+
+
+def test_active_agent_record_runtime_steps_and_last_action_exactly():
+    ev = [_ev(1, "agent/start", 10, actor="a", role="worker", purpose="work", task_id="t1", model="codex:x"),
+          _ev(2, "agent/start", 11, actor="b", role="planner", purpose="plan", model="claude-code:s"),
+          _ev(3, "agent/start", 12, actor="c", role="worker", purpose="work", model="mine"),
+          _ev(4, "agent/start", 9, actor="d", role="worker", purpose="work", model="x", runtime="custom"),
+          _ev(5, "tool/call", 20, actor="a", task_id="t1", tool="Read", input={"file_path": "/q/z.md"}),
+          _ev(6, "tool/call", 21, actor="a", task_id="t2", tool="Bash", input={"command": "ls"}),  # other task: not a's
+          _ev(7, "tool/call", 22, actor="b", name="submit", input={}),
+          _ev(8, "llm/error", 23, actor="c", error="e" * 300),
+          _ev(9, "provider/limited", 24, actor="d"),
+          _ev(10, "agent/end", 25, actor="a", task_id="t1", purpose="review")]  # other purpose: a stays
+    a = {x["actor"]: x for x in active_agents(ev)}
+    assert [x["actor"] for x in active_agents(ev)] == ["d", "a", "b", "c"]  # by start time
+    assert a["a"] == {"actor": "a", "role": "worker", "task_id": "t1", "purpose": "work", "runtime": "codex",
+                      "model": "codex:x", "since": 10, "last": "Read", "last_ts": 20, "steps": 1,
+                      "last_action": "читает файл z.md"}
+    assert (a["b"]["runtime"], a["b"]["last"], a["b"]["last_action"], a["b"]["steps"]) == (
+        "claude_code", "submit", "выполняет шаг", 1)
+    assert (a["c"]["runtime"], a["c"]["last"], a["c"]["last_action"], a["c"]["steps"], a["c"]["last_ts"]) == (
+        "native", "ошибка: " + "e" * 160, "ошибка", 0, 23)
+    assert (a["d"]["runtime"], a["d"]["last"], a["d"]["last_ts"], a["d"]["task_id"]) == ("custom", "ошибка: ", 24, None)
+    ended = [*ev, _ev(11, "agent/end", 26, actor="a", task_id="t1", purpose="work")]
+    assert [x["actor"] for x in active_agents(ended)] == ["d", "b", "c"]
+    assert active_agents(ev[:1], live=False) == []
+
+
+def _run(extra=(), **kw):
+    base = [_ev(1, "agent/start", 1, actor="p", purpose="plan", task_id=None)]
+    return run_activity(base + list(extra), actor="p", task_id=None, purpose="plan", **kw)
+
+
+def test_run_activity_exact_items_in_both_modes():
+    ev = [_ev(2, "tool/call", 2, actor="p", tool="Bash", call_id="c", input={"command": "ls"}),
+          _ev(3, "tool/result", 3, actor="p", tool="Bash", call_id="c", is_error=False, output="\n\nfile1\nfile2"),
+          _ev(4, "tool/result", 4, actor="p", tool="Bash", call_id="nope", is_error=True, output="stray"),
+          _ev(5, "tool/call", 5, actor="p", tool="Read", input={"file_path": "/q/r.md"}),  # no call_id: seq is the key
+          _ev(6, "llm/error", 6, actor="p", error="  rate   limit " + "x" * 100),
+          _ev(7, "tool/call", 7, actor="other", tool="Read", call_id="o", input={}),
+          _ev(8, "tool/call", 8, actor="p", task_id="t9", tool="Read", call_id="t", input={}),
+          _ev(9, "agent/start", 9, actor="p", purpose="work", task_id=None, model="m"),  # another purpose: not ours
+          _ev(10, "agent/end", 10, actor="p", purpose="work")]
+    user = _run(ev, user=True)
+    assert user["open"] is True and user["more"] is False
+    assert user["items"][:2] == [
+        {"seq": 2, "ts": 2, "text": "выполняет команду", "detail": "ls", "state": "ok", "result": ""},
+        {"seq": 5, "ts": 5, "text": "читает файл r.md", "detail": "r.md", "state": "running", "result": ""}]
+    assert user["items"][2]["text"] == "модель ответила ошибкой" and user["items"][2]["state"] == "error"
+    assert [i["seq"] for i in user["items"]] == [2, 5, 6, 8]
+    dev = _run(ev, user=False)
+    assert dev["items"][0] == {"seq": 2, "ts": 2, "text": "выполняет команду", "detail": "ls", "state": "ok",
+                               "result": "file1", "tool": "Bash"}
+    assert "tool" not in dev["items"][2]
+    assert user["items"][2]["result"] == "rate limit " + "x" * 68 + "…" and len(user["items"][2]["result"]) == 80
+    assert user["items"][3]["state"] == "running"  # t9 event has a task_id but the run has none: it still belongs
+
+
+def test_run_activity_limit_cap_before_and_run_selection():
+    many = [_ev(10 + i, "tool/call", 10 + i, actor="p", tool="Bash", call_id=f"k{i}", input={"command": "c"})
+            for i in range(250)]
+    assert len(_run(many)["items"]) == 50
+    big = _run(many, limit=9999)
+    assert len(big["items"]) == 200 and big["more"] is True and big["items"][-1]["seq"] == 259
+    assert len(_run(many, limit=0)["items"]) == 1
+    exact = _run(many[:50], limit=50)
+    assert len(exact["items"]) == 50 and exact["more"] is False
+    assert [i["seq"] for i in _run(many, limit=3, before=15)["items"]] == [12, 13, 14]
+    assert _run(many, limit=3, before=13)["more"] is False
+    assert _run(many, limit=2, before=15)["more"] is True
+    # unknown run: nothing, closed
+    assert run_activity([], "p", None, "plan") == {"items": [], "more": False, "open": False}
+    assert run_activity([_ev(1, "agent/start", actor="p", purpose="work", task_id="t")], "p", None, "work") == \
+        {"items": [], "more": False, "open": False}
+    # latest start of THIS key wins; an end of another purpose or actor does not close it
+    ev = [_ev(1, "agent/start", actor="p", purpose="plan", task_id=None),
+          _ev(2, "tool/call", actor="p", tool="Read", call_id="a", input={}),
+          _ev(3, "agent/start", actor="p", purpose="plan", task_id=None),
+          _ev(4, "agent/end", actor="q", purpose="plan"),
+          _ev(5, "agent/end", actor="p", purpose="work"),
+          _ev(6, "tool/call", actor="p", tool="Read", call_id="b", input={}),
+          _ev(7, "agent/start", actor="q", purpose="plan", task_id=None)]
+    r = run_activity(ev, "p", None, "plan")
+    assert r["open"] is True and [i["seq"] for i in r["items"]] == [6]
+    task_run = run_activity([_ev(1, "agent/start", actor="p", purpose="work", task_id="t1"),
+                             _ev(2, "tool/call", actor="p", task_id="t1", tool="Read", call_id="x", input={}),
+                             _ev(3, "tool/call", actor="p", task_id="t2", tool="Read", call_id="y", input={}),
+                             _ev(4, "tool/call", actor="p", tool="Read", call_id="z", input={})],
+                            "p", "t1", "work")
+    assert [i["seq"] for i in task_run["items"]] == [2, 4]
