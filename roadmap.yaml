@@ -51,6 +51,7 @@ waves:
   14: "M4 · Управление и внимание владельца (П7)"
   15: "M5 · Долгий горизонт: приложения над оболочкой, L, провайдеры (П8, U2, U7)"
   16: "M6 · Выпуск 1.0 (П9)"
+  18: "D · Десктоп — основной интерфейс (идёт параллельно этапам)"
   20: "После 1.0"
 
 items:
@@ -1333,13 +1334,6 @@ items:
     title: "Relay server with end-to-end encryption and the Android client, SPEC П8b"
     source: {harness: Arteliq, repo: MisterReds/arteliq, paths: [docs/SPEC.md]}
     acceptance: ["the Android client controls a project through the relay; the relay cannot read the traffic"]
-  - id: X-native-shell
-    wave: 20
-    mode: design
-    status: planned
-    title: "Native desktop shell with tray, only if the installed web app is not enough, SPEC П8a step 2"
-    source: {harness: Arteliq, repo: MisterReds/arteliq, paths: [docs/SPEC.md]}
-    acceptance: ["decision recorded after the installed web app is tried; the shell ships only if it is not enough"]
   - id: X-proactive
     wave: 20
     mode: design
@@ -1453,7 +1447,7 @@ items:
     wave: 15
     mode: design
     status: planned
-    title: 'Conversation-first interface: the request stream with result cards in the centre, preview, changes and
+    title: "Conversation-first interface of the desktop app: the request stream with result cards in the centre, preview, changes and files beside it; the board and the journal as a secondary view"
       files beside it; the board and the journal as a secondary view'
     source:
       harness: Arteliq
