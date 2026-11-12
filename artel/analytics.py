@@ -10,7 +10,7 @@ import time
 from collections import defaultdict
 from pathlib import Path
 
-from .humanize import DETAIL_MAX, action_text, block_ask_id, block_question
+from .humanize import action_text, block_ask_id, block_question, clip
 from .project import Project, artel_home
 from .reports import redact
 from .runtimes import runtime_for
@@ -121,8 +121,8 @@ ACTIVITY_MAX = 200
 
 def _run_start(events: list[dict], actor, task_id, purpose) -> int | None:
     """Index of the latest ``agent/start`` of this run, or None."""
-    return next((i for i in range(len(events) - 1, -1, -1)
-                 if events[i]["kind"] == "agent/start" and _agent_key(events[i]) == (actor, task_id, purpose)), None)
+    key = (actor, task_id, purpose)
+    return max((i for i, e in enumerate(events) if e["kind"] == "agent/start" and _agent_key(e) == key), default=None)
 
 
 def _step(e: dict, user: bool) -> dict:
@@ -136,7 +136,7 @@ def _step(e: dict, user: bool) -> dict:
 def _finish_step(it: dict, e: dict, user: bool) -> None:
     it["state"] = "error" if e.get("is_error") else "ok"
     first = next((ln for ln in str(e.get("output") or "").splitlines() if ln.strip()), "")
-    it["result"] = redact(_short_line(first)) if e.get("is_error") or not user else ""
+    it["result"] = redact(clip(first)) if e.get("is_error") or not user else ""
 
 
 def _apply(items: dict, e: dict, user: bool) -> None:
@@ -147,7 +147,7 @@ def _apply(items: dict, e: dict, user: bool) -> None:
         _finish_step(items[e["call_id"]], e, user)
     elif k == "llm/error":
         items[("err", e["seq"])] = {"seq": e["seq"], "ts": e["ts"], "text": "модель ответила ошибкой", "detail": "",
-                                    "state": "error", "result": redact(_short_line(e.get("error", "")))}
+                                    "state": "error", "result": redact(clip(e.get("error")))}
 
 
 def run_activity(events: list[dict], actor: str | None, task_id: str | None, purpose: str | None, user: bool = True,
@@ -170,11 +170,6 @@ def run_activity(events: list[dict], actor: str | None, task_id: str | None, pur
         _apply(items, e, user)
     rows = [i for i in items.values() if not before or i["seq"] < before]
     return {"items": rows[-limit:], "more": len(rows) > limit, "open": is_open}
-
-
-def _short_line(s) -> str:
-    s = " ".join(str(s or "").split())
-    return s if len(s) <= DETAIL_MAX else s[:DETAIL_MAX - 1].rstrip() + "…"
 
 
 def task_timelines(events: list[dict]) -> dict[str, list]:

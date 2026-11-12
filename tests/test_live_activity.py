@@ -253,3 +253,42 @@ def test_run_activity_limit_cap_before_and_run_selection():
                              _ev(4, "tool/call", actor="p", tool="Read", call_id="z", input={})],
                             "p", "t1", "work")
     assert [i["seq"] for i in task_run["items"]] == [2, 4]
+
+
+def test_a_fresh_agent_record_and_odd_events():
+    fresh = active_agents([_ev(1, "agent/start", 5, actor="a", role="r", purpose="plan")])
+    assert fresh == [{"actor": "a", "role": "r", "task_id": None, "purpose": "plan", "runtime": "native", "model": "",
+                      "since": 5, "last": "", "last_ts": 5, "steps": 0, "last_action": ""}]
+    both = active_agents([_ev(1, "agent/start", 5, actor="a", purpose="plan"),
+                          _ev(2, "tool/call", 6, actor="a"), _ev(3, "llm/error", 7, actor="a")])
+    assert (both[0]["last"], both[0]["steps"], both[0]["last_action"]) == ("ошибка: ", 1, "ошибка")
+    nameless = active_agents([_ev(1, "agent/start", 5, actor="a", purpose="plan"), _ev(2, "tool/call", 6, actor="a")])
+    assert (nameless[0]["last"], nameless[0]["last_action"]) == ("", "выполняет шаг")
+
+
+def test_run_results_and_error_items_are_exact():
+    ev = [_ev(2, "tool/call", 2, actor="p", tool="Bash", call_id="a", input={}),
+          _ev(3, "tool/result", 3, actor="p", call_id="a", is_error=True, output="\n \n  first   line \nsecond"),
+          _ev(4, "tool/call", 4, actor="p", tool="Bash", call_id="b", input={}),
+          _ev(5, "tool/result", 5, actor="p", call_id="b", is_error=False, output=None),
+          _ev(6, "tool/call", 6, actor="p", tool="Bash", call_id="c", input={}),
+          _ev(7, "tool/result", 7, actor="p", call_id="c", is_error=False, output=" \n "),
+          _ev(8, "llm/error", 8, actor="p", error="a" * 78 + " " + "b" * 20),
+          _ev(9, "llm/error", 9, actor="p")]
+    u = _run(ev, user=True)["items"]
+    assert (u[0]["state"], u[0]["result"]) == ("error", "first line")
+    assert (u[1]["state"], u[1]["result"], u[2]["state"], u[2]["result"]) == ("ok", "", "ok", "")
+    d = _run(ev, user=False)["items"]
+    assert (d[1]["result"], d[2]["result"]) == ("", "")
+    assert u[3] == {"seq": 8, "ts": 8, "text": "модель ответила ошибкой", "detail": "", "state": "error",
+                    "result": "a" * 78 + "…"}
+    assert u[4] == {"seq": 9, "ts": 9, "text": "модель ответила ошибкой", "detail": "", "state": "error", "result": ""}
+    assert "tool" not in _run(ev)["items"][0]  # user mode is the default
+    assert d[0]["tool"] == "Bash"
+    ok_dev = _run([_ev(2, "tool/call", 2, actor="p", tool="Bash", call_id="a", input={}),
+                   _ev(3, "tool/result", 3, actor="p", call_id="a", is_error=False, output="one\ntwo")], user=False)
+    assert ok_dev["items"][0]["result"] == "one"
+    exact = _run([_ev(2, "llm/error", 2, actor="p", error="y" * 80)])["items"][0]["result"]
+    assert exact == "y" * 80
+    assert _run([_ev(2, "llm/error", 2, actor="p", error="y" * 81)])["items"][0]["result"] == "y" * 79 + "…"
+    assert action_text("Bash", {"command": "q" * 78 + " " + "z" * 9})[1] == "q" * 78 + "…"

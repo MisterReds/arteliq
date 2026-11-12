@@ -193,24 +193,25 @@ _SHELL_TOOLS = {"bash", "shell"}
 DETAIL_MAX = 80
 
 
-def _clip(s: str, n: int = DETAIL_MAX) -> str:
+def clip(s, n: int = DETAIL_MAX) -> str:
+    """One line, whitespace collapsed, cut to ``n`` characters with an ellipsis."""
     s = " ".join(str(s or "").split())
     return s if len(s) <= n else s[:n - 1].rstrip() + "…"
 
 
 def _file_action(t: str, inp: dict) -> tuple[str, str]:
     path = str(inp.get("file_path") or inp.get("path") or inp.get("notebook_path") or "")
-    name = PurePath(path).name if path else ""
-    return (f"{_FILE_VERBS[t]} {name}" if name else _FILE_VERBS[t]), _clip(redact(name))
+    name = PurePath(path).name
+    return (f"{_FILE_VERBS[t]} {name}" if name else _FILE_VERBS[t]), clip(redact(name))
 
 
 def action_text(tool: str | None, inp) -> tuple[str, str]:
     """(sentence, detail) for one tool call: «читает файл README.md», «выполняет команду» + the command, cut to
     80 characters and redacted. Unknown tools read as a generic step; the tool name is never part of the sentence."""
-    t = str(tool or "").lower()
+    t = str(tool).lower()
     inp = inp if isinstance(inp, dict) else {}
     if t in _FILE_VERBS:
         return _file_action(t, inp)
     if t in _SHELL_TOOLS:
-        return "выполняет команду", _clip(redact(inp.get("command", "")))
+        return "выполняет команду", clip(redact(inp.get("command")))
     return _PLAIN_VERBS.get(t, "выполняет шаг"), ""
