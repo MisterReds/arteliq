@@ -106,7 +106,7 @@ def served(tmp_path, monkeypatch):
 
 
 def _get(url, cookie=None):
-    r = urllib.request.Request(url, headers={"Cookie": f"{COOKIE}={cookie}"} if cookie else {})
+    r = urllib.request.Request(url, headers={"Cookie": f"{COOKIE}={cookie}"} if cookie else {})  # noqa: S310
     try:
         with urllib.request.urlopen(r, timeout=5) as resp:  # noqa: S310
             return resp.status, json.loads(resp.read())
